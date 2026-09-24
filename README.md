@@ -2,6 +2,14 @@
 
 A local Next.js dashboard for your Railway account(s). See every project and its status across your Hobby and Pro workspaces, drill down to services and deployments, check usage and billing, and clean things up. Nothing changes until you have reviewed and approved it.
 
+## Why I built this
+
+I was looking at my recent Railway bills — almost **$120 a month** across **119 projects**. Not all of them needed to be running every day. Taking them down one by one in Railway's own dashboard was a painful process, so I used Claude and Cursor to build this Next.js app.
+
+With it I took every project offline in one click, then turned back on only the ones I still needed.
+
+![Services page after cleanup: 94 services, 1 online, 93 offline](docs/dashboard-after-cleanup.jpg)
+
 - **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money.
 - **Project.** Cost by service and by resource, a service table for each environment, volumes, and a danger zone.
 - **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, and the deployment history with bulk actions and logs.
