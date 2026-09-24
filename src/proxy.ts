@@ -1,12 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { isMockMode } from "@/lib/config";
+
 /**
  * Runs before every page, route and Server Action.
  *
  * 1. Host check (always on). Only requests addressed to this machine by a local
  *    name are served. This blocks DNS-rebinding attacks, where a web page you visit
  *    re-points its own domain at 127.0.0.1 to script this dashboard. Add other names
- *    with DASHBOARD_ALLOWED_HOSTS if you really need them.
+ *    with DASHBOARD_ALLOWED_HOSTS if you really need them. The public Vercel demo
+ *    is allowed only while the app is in mock mode (no real Railway token).
  * 2. Optional password (HTTP Basic auth, any username) when DASHBOARD_PASSWORD is set.
  */
 
@@ -18,13 +21,33 @@ function hostName(hostHeader: string): string {
   return host.split(":")[0];
 }
 
+function vercelHost(value: string | undefined): string | undefined {
+  if (!value?.trim()) return undefined;
+  const raw = value.trim();
+  try {
+    return new URL(raw.includes("://") ? raw : `https://${raw}`).hostname.toLowerCase();
+  } catch {
+    return raw.replace(/^https?:\/\//, "").split("/")[0]?.split(":")[0]?.toLowerCase();
+  }
+}
+
 function hostAllowed(hostHeader: string | null): boolean {
   if (!hostHeader) return false;
+  const name = hostName(hostHeader);
   const extra = (process.env.DASHBOARD_ALLOWED_HOSTS ?? "")
     .split(",")
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean);
-  return [...LOCAL_HOSTS, ...extra].includes(hostName(hostHeader));
+  if ([...LOCAL_HOSTS, ...extra].includes(name)) return true;
+
+  if (!isMockMode()) return false;
+  if (name === "vercel.app" || name.endsWith(".vercel.app")) return true;
+  const vercelNames = [
+    vercelHost(process.env.VERCEL_URL),
+    vercelHost(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    vercelHost(process.env.VERCEL_BRANCH_URL),
+  ].filter((h): h is string => !!h);
+  return vercelNames.includes(name);
 }
 
 function constantTimeEqual(a: string, b: string): boolean {

@@ -18,7 +18,18 @@ export type AccountConfig = {
 const TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
 const flag = (value: string | undefined) => !!value && TRUE_VALUES.has(value.trim().toLowerCase());
 
-export const isMockMode = () => flag(process.env.RAILWAY_MOCK);
+function envHasRailwayToken(): boolean {
+  if (process.env.RAILWAY_API_TOKEN?.trim()) return true;
+  for (const [name, raw] of Object.entries(process.env)) {
+    if (!/^RAILWAY_TOKEN_[A-Z0-9_]+$/.test(name)) continue;
+    if (name.endsWith("_WORKSPACE_ID")) continue;
+    if (raw?.trim()) return true;
+  }
+  return false;
+}
+
+/** Demo data: RAILWAY_MOCK=1, or a Vercel deploy with no Railway token (the public preview). */
+export const isMockMode = () => flag(process.env.RAILWAY_MOCK) || (process.env.VERCEL === "1" && !envHasRailwayToken());
 
 /** Hard lock from .env — Write mode in the header cannot override this. */
 export const isEnvReadOnly = () => flag(process.env.DASHBOARD_READ_ONLY);

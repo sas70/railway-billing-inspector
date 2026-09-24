@@ -2,6 +2,8 @@
 
 A local Next.js dashboard for your Railway account(s). See every project and its status across your Hobby and Pro workspaces, drill down to services and deployments, check usage and billing, and clean things up. Nothing changes until you have reviewed and approved it.
 
+**See it in action:** [railway-billing-inspector.vercel.app](https://railway-billing-inspector.vercel.app) — demo data only, nothing is sent to Railway. For your own account, run it locally with a token (below).
+
 ## Why I built this
 
 I was looking at my recent Railway bills — almost **$120 a month** across **119 projects**. Not all of them needed to be running every day. Taking them down one by one in Railway's own dashboard was a painful process, so I used Claude and Cursor to build this Next.js app.
@@ -95,8 +97,8 @@ These use a 30-day month (43,200 minutes). Other inputs:
 - **Tokens never reach the browser.** They are read from `.env.local` by the Next.js server only, and `.env.local` is git-ignored.
 - **An account token can do anything your account can.** Railway does not ask for 2FA on API tokens, so treat the token like a password. Revoke it at railway.com/account/tokens if it ever leaks.
 - **Local only by default.** The scripts bind to `127.0.0.1` (Next.js would otherwise listen on every network interface), so other devices can't reach the dashboard.
-- **Host check (`src/proxy.ts`).** The dashboard only answers requests addressed to `127.0.0.1`, `localhost` or `[::1]`. This stops a web page you visit from pointing its own domain at your machine (DNS rebinding) and scripting the dashboard. Add other names with `DASHBOARD_ALLOWED_HOSTS` only if you really need to.
-- **`DASHBOARD_PASSWORD`** adds HTTP Basic auth (any username) to every page and action. Set it if you ever run the dashboard anywhere other than your own machine. Don't deploy it publicly.
+- **Host check (`src/proxy.ts`).** Locally the dashboard only answers requests addressed to `127.0.0.1`, `localhost` or `[::1]`. This stops a web page you visit from pointing its own domain at your machine (DNS rebinding) and scripting the dashboard. The public Vercel demo is allowed only in mock mode (no Railway token). Add other names with `DASHBOARD_ALLOWED_HOSTS` only if you really need to.
+- **`DASHBOARD_PASSWORD`** adds HTTP Basic auth (any username) to every page and action. Set it if you ever run the dashboard anywhere other than your own machine. Don't put a real Railway token on a public host.
 - **`DASHBOARD_READ_ONLY=true`** turns off every action, and the server refuses writes too.
 - **`PROTECTED_PROJECTS`** lists projects, by name or ID, that can't be changed from here at all; only cancelling a scheduled deletion is still allowed. The Overview warns you about entries that match no project, so a typo can't silently leave a project unprotected.
 - **Confirmation phrases prevent accidents.** They are not authentication. Access control comes from the localhost binding and the optional password.
