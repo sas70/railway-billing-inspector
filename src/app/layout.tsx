@@ -18,7 +18,7 @@ export const metadata: Metadata = {
 
 function Logo() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true">
+    <svg width="32" height="32" viewBox="0 0 24 24" aria-hidden="true">
       <rect x="1.5" y="1.5" width="21" height="21" rx="5" fill="var(--series-1)" />
       <path d="M6 16.5a6 6 0 0 1 12 0" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
       <path d="M12 16.5 15 11" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
@@ -57,13 +57,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           Skip to content
         </a>
-        <header className="sticky top-0 z-30 border-b border-line bg-surface">
-          <div className="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:gap-5 sm:px-6">
-            <Link href="/" className="flex shrink-0 items-center gap-2 font-semibold tracking-tight" aria-label="Railway Billing Inspector — overview">
+        <header className="app-header sticky top-0 z-30 border-b border-line bg-surface">
+          <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-5 gap-y-3 px-4 pt-4 sm:px-6 lg:flex-nowrap lg:py-4">
+            <Link href="/" className="flex shrink-0 items-center gap-2.5 font-semibold tracking-tight" aria-label="Railway Billing Inspector — overview">
               <Logo />
-              <span className="hidden md:inline">Railway Billing Inspector</span>
+              <span className="leading-tight">
+                <span className="block text-sm">Railway</span>
+                <span className="hidden text-xs font-normal tracking-normal text-ink-2 sm:block">Billing Inspector</span>
+              </span>
             </Link>
-            <nav aria-label="Main" className="flex min-w-0 items-center gap-0.5 text-sm">
+            <nav aria-label="Main" className="order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto pb-3 lg:order-none lg:ml-5 lg:w-auto lg:pb-0">
               <NavLink href="/">Overview</NavLink>
               <NavLink href="/services">Services</NavLink>
               <NavLink href="/billing">Billing</NavLink>
@@ -75,16 +78,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </nav>
             <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
               {demo && (
-                <Badge tone="info" title="RAILWAY_MOCK is on: fake data, nothing is sent to Railway">
-                  Demo<span className="hidden sm:inline"> data</span>
-                </Badge>
+                <span className="hidden sm:inline-flex">
+                  <Badge tone="info" title="RAILWAY_MOCK is on: fake data, nothing is sent to Railway">
+                    Demo data
+                  </Badge>
+                </span>
               )}
               <WriteModeToggle envLocked={isEnvReadOnly()} />
               <RefreshButton />
             </div>
           </div>
         </header>
-        <main id="main" className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <main id="main" className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
+          {demo && <div className="mb-5 text-xs font-medium text-link sm:hidden">Demo workspace · sample data</div>}
           {children}
         </main>
         <Footer />

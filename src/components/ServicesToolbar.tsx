@@ -3,6 +3,7 @@
 import { useId } from "react";
 
 import type { StatusFilter } from "@/lib/service-stats";
+import { Icon } from "./Icon";
 
 export function ServicesToolbar({
   query,
@@ -24,19 +25,22 @@ export function ServicesToolbar({
   const searchId = useId();
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-3">
-      <label className="sr-only" htmlFor={searchId}>
-        Search services
-      </label>
-      <input
-        id={searchId}
-        type="search"
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-        placeholder="Search service, project, workspace…"
-        className="h-8 w-full min-w-[12rem] flex-1 rounded-md border border-line bg-surface px-2.5 text-sm outline-none placeholder:text-ink-2 focus:border-[var(--series-1)] sm:max-w-xs"
-      />
-      <div className="flex rounded-md border border-line p-0.5 text-xs" role="group" aria-label="Status filter">
+    <div className="flex flex-wrap items-center gap-3 border-b border-line px-5 py-4">
+      <div className="relative w-full min-w-0 sm:max-w-sm sm:flex-1">
+        <label className="sr-only" htmlFor={searchId}>
+          Search services
+        </label>
+        <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-3 text-ink-2" />
+        <input
+          id={searchId}
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search service, project, workspace…"
+          className="h-10 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm placeholder:text-ink-2 focus:border-[var(--series-1)]"
+        />
+      </div>
+      <div className="flex rounded-lg border border-line bg-page p-1 text-xs" role="group" aria-label="Status filter">
         {(
           [
             ["all", "All"],
@@ -49,14 +53,14 @@ export function ServicesToolbar({
             type="button"
             aria-pressed={filter === id}
             onClick={() => onFilter(id)}
-            className={`rounded px-2.5 py-1 font-medium ${filter === id ? "bg-surface-2 text-ink" : "text-ink-2 hover:text-ink"}`}
+            className={`rounded-md px-3 py-1.5 font-medium ${filter === id ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
           >
             {label}
           </button>
         ))}
       </div>
       <div className="ml-auto flex flex-wrap items-center gap-1.5">
-        <span className="text-xs text-ink-2">{visible === total ? `${total} services` : `${visible} of ${total}`}</span>
+        <span className="text-xs text-ink-2" role="status">{visible === total ? `${total} services` : `${visible} of ${total}`}</span>
         {actions}
       </div>
     </div>

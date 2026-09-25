@@ -8,15 +8,15 @@ import { Icon, type IconName } from "./Icon";
 // ── Layout primitives ───────────────────────────────────────────────────────
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-lg border border-line bg-surface ${className}`}>{children}</section>;
+  return <section className={`panel min-w-0 rounded-xl border border-line bg-surface ${className}`}>{children}</section>;
 }
 
 export function CardHeader({ title, subtitle, actions }: { title: React.ReactNode; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3">
+    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
       <div className="min-w-0">
         <h2 className="text-sm font-semibold">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-xs text-ink-2">{subtitle}</p>}
+        {subtitle && <p className="mt-1 text-xs leading-relaxed text-ink-2">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -28,10 +28,10 @@ export function PageTitle({ title, subtitle, badges, actions }: { title: React.R
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-3xl font-semibold tracking-[-0.035em]">{title}</h1>
           {badges}
         </div>
-        {subtitle && <p className="mt-1 text-sm text-ink-2">{subtitle}</p>}
+        {subtitle && <p className="mt-2 max-w-3xl text-sm leading-relaxed text-ink-2">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -208,15 +208,15 @@ export function StatTile({
   chart?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-lg border border-line bg-surface p-4">
+    <div className="panel min-w-0 rounded-xl border border-line bg-surface p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-sm text-ink-2">
-            {icon && <Icon name={icon} size={14} color={iconColor ?? "var(--ink-2)"} />}
+            {icon && <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-surface-2"><Icon name={icon} size={14} color={iconColor ?? "var(--ink-2)"} /></span>}
             {label}
           </div>
-          <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
-          {sub && <div className="mt-1 text-xs text-ink-2">{sub}</div>}
+          <div className="mt-3 text-3xl font-semibold tracking-tight tabular">{value}</div>
+          {sub && <div className="mt-1.5 text-xs leading-relaxed text-ink-2">{sub}</div>}
         </div>
         {chart && <div className="mt-0.5 shrink-0">{chart}</div>}
       </div>

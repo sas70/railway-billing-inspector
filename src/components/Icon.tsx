@@ -18,9 +18,11 @@ export type IconName =
   | "rotate"
   | "layers"
   | "trend"
+  | "search"
   | "wallet";
 
 const PATHS: Record<IconName, React.ReactNode> = {
+  search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
   check: <polyline points="20 6 9 17 4 12" />,
   x: (
     <>
