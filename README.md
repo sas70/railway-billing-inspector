@@ -6,7 +6,7 @@ A local Next.js dashboard for your Railway account(s). See every project and its
 
 ## Why I built this
 
-I was looking at my recent Railway bills — almost **$120 a month** across **119 projects**. Not all of them needed to be running every day. Taking them down one by one in Railway's own dashboard was a painful process, so I used Claude and Cursor to build this Next.js app.
+I was looking at my recent Railway bills — almost **$120 a month** across **94 projects**. Not all of them needed to be running every day. Taking them down one by one in Railway's own dashboard was a painful process, so I used Claude and Cursor to build this Next.js app.
 
 With it I took every project offline in one click, then turned back on only the ones I still needed.
 
