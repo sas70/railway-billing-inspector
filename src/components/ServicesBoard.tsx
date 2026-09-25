@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BulkMasterButtons } from "@/components/BulkMaster";
 import { MiniHistogram, MiniPie } from "@/components/MiniCharts";
 import { ServicesToolbar } from "@/components/ServicesToolbar";
+import { buttonClass } from "@/components/button";
 import { Card, Money, StatTile } from "@/components/ui";
 import { money, plural } from "@/lib/format";
 import type { ServiceCatalogRow } from "@/lib/service-row";
@@ -39,7 +40,7 @@ export function ServicesBoard({
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Services"
           icon="layers"
@@ -115,7 +116,20 @@ export function ServicesBoard({
           total={rows.length}
           actions={<BulkMasterButtons rows={visible} readOnly={readOnly} />}
         />
-        {children}
+        <div hidden={filtered && stats.count === 0}>{children}</div>
+        {filtered && stats.count === 0 && (
+          <div className="px-5 py-12 text-center">
+            <p className="text-sm font-semibold">No services match your filters</p>
+            <p className="mt-1 text-sm text-ink-2">Try another name or clear the filters to see all services.</p>
+            <button
+              type="button"
+              className={`${buttonClass("neutral", "md")} mt-4`}
+              onClick={() => { setQuery(""); setFilter("all"); }}
+            >
+              Clear filters
+            </button>
+          </div>
+        )}
       </Card>
     </>
   );

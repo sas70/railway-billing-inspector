@@ -9,6 +9,7 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3100",
     "typecheck": "next typegen && tsc --noEmit",
+    "test:cost-history": "node --test scripts/test-cost-history.mjs",
     "check:queries": "node scripts/check-queries.mjs"
   },
   "dependencies": {

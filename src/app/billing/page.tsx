@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Icon } from "@/components/Icon";
+import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
 import {
   Badge,
@@ -108,18 +109,21 @@ export default async function BillingPage({ searchParams }: Props) {
           </>
         }
         actions={
-          <div role="group" aria-label="Billing period" className="flex rounded-md border border-line bg-surface p-0.5 text-sm">
-            {(["current", "previous"] as const).map((p) => (
-              <Link
-                key={p}
-                href={`/billing?period=${p}`}
-                aria-current={p === which ? "true" : undefined}
-                className={`rounded px-3 py-1 ${p === which ? "bg-surface-2 font-medium" : "text-ink-2 hover:text-ink"}`}
-              >
-                {p === "current" ? "Current period" : "Previous period"}
-              </Link>
-            ))}
-          </div>
+          <>
+            <Link href="/billing/history" className={buttonClass("neutral", "md")}><Icon name="trend" /> Cost history</Link>
+            <div role="group" aria-label="Billing period" className="flex rounded-md border border-line bg-surface p-0.5 text-sm">
+              {(["current", "previous"] as const).map((p) => (
+                <Link
+                  key={p}
+                  href={`/billing?period=${p}`}
+                  aria-current={p === which ? "true" : undefined}
+                  className={`rounded px-3 py-1 ${p === which ? "bg-surface-2 font-medium" : "text-ink-2 hover:text-ink"}`}
+                >
+                  {p === "current" ? "Current period" : "Previous period"}
+                </Link>
+              ))}
+            </div>
+          </>
         }
       />
 

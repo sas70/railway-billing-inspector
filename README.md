@@ -16,6 +16,7 @@ With it I took every project offline in one click, then turned back on only the 
 - **Project.** Cost by service and by resource, a service table for each environment, volumes, and a danger zone.
 - **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, and the deployment history with bulk actions and logs.
 - **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits, the next invoice, invoices with PDF links, and cost by project and resource. Also available for the previous period.
+- **Cost history.** Open **Billing → Cost history** to compare the last 7 or 30 complete UTC days with the preceding equal window. Projects are ranked by absolute spending change, with dollar and percentage differences, increase/decrease filters, search, and expandable resource changes. Deleted projects are included; workspaces missing either range are excluded from both totals. This compares metered resource costs at current list prices, excluding plan fees, included usage, credits and tax. Today is excluded to avoid comparing a partial day.
 - **Audit log.** Every approved action, with the phrase used to approve it and Railway's answer. You can export it as CSV and cancel scheduled project deletions from here.
 
 ---
@@ -117,6 +118,8 @@ These use a 30-day month (43,200 minutes). Other inputs:
 ---
 
 ## Keeping in sync with Railway's API
+
+Run `npm run test:cost-history` to check date windows, project and resource deltas, missing data, deleted projects, and zero baselines.
 
 ```bash
 npm run check:queries

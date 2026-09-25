@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Icon } from "@/components/Icon";
+import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
 import {
   Badge,
@@ -79,7 +80,8 @@ export default async function OverviewPage() {
     <div className="space-y-6">
       <PageTitle
         title="Overview"
-        subtitle={`${plural(workspaceCount, "workspace")} across ${plural(accounts.length, "token")}. Open a project to drill into services, deployments and costs.`}
+        subtitle={`Your infrastructure, at a glance. Costs and service health across ${plural(workspaceCount, "workspace")}.`}
+        actions={<Link href="/services" className={buttonClass("neutral", "md")}>Explore services <Icon name="chevron" size={14} /></Link>}
       />
 
       {accounts
@@ -96,54 +98,59 @@ export default async function OverviewPage() {
         </Notice>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,2fr)]">
-        <Card className="p-5">
-          <div className="text-sm text-ink-2">Projected cost this billing period</div>
-          <div className="mt-1 text-5xl font-semibold tracking-tight">{money(projected)}</div>
-          <p className="mt-2 text-sm text-ink-2">
-            {money(usageToDate)} of usage so far across all workspaces. Projection = plan fees + usage above what each plan includes, before
-            tax and credits{projectedComplete ? "." : " (some workspaces have no billing access, so this is partial)."}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+        <Card className="cost-summary flex flex-col p-6 sm:p-7">
+          <div className="flex items-center justify-between gap-3">
+            <div className="text-sm font-medium">Projected period cost</div>
+            <Icon name="wallet" size={20} className="opacity-60" />
+          </div>
+          <div className="mt-5 flex flex-wrap items-baseline gap-3">
+            <span className="text-6xl font-semibold tracking-[-0.055em] tabular">{money(projected)}</span>
+            <span className="cost-summary-muted text-xs">{projectedComplete ? "estimated" : "partial estimate"}</span>
+          </div>
+          <p className="cost-summary-muted mt-3 max-w-sm text-xs leading-relaxed">
+            Plan fees + usage above included allowances. Before tax and credits.
+            {!projectedComplete && " Some workspaces have no billing access."}
           </p>
-          <Link href="/billing" className="link mt-3 inline-block text-sm">
-            Billing details →
-          </Link>
+          <div className="cost-summary-footer flex flex-wrap items-end justify-between gap-4 border-t pt-5">
+            <div><div className="cost-summary-muted text-xs">Usage so far</div><div className="mt-1 text-xl font-semibold tabular">{money(usageToDate)}</div></div>
+            <Link href="/billing" className="inline-flex items-center gap-2 rounded-md py-1 text-sm font-medium underline-offset-4 hover:underline">View billing <Icon name="chevron" size={14} /></Link>
+          </div>
         </Card>
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4">
-          <StatTile label="Projects" value={projectCount} sub={plural(workspaceCount, "workspace")} />
-          <StatTile label="Live services" value={totals.live} sub={totals.sleeping ? `+ ${totals.sleeping} sleeping` : "running now"} />
+        <div className="grid grid-cols-2 gap-4">
+          <StatTile label="Projects" icon="layers" iconColor="var(--series-1)" value={projectCount} sub={plural(workspaceCount, "workspace")} />
+          <StatTile label="Live services" icon="power" iconColor="var(--good-text)" value={totals.live} sub={totals.sleeping ? `+ ${totals.sleeping} sleeping` : "running now"} />
           <StatTile
             label="Needs attention"
-            value={
-              <span className="inline-flex items-center gap-2">
-                {needsAttention(totals) > 0 && <Icon name="alert" size={20} color="var(--status-critical)" />}
-                {needsAttention(totals)}
-              </span>
-            }
+            icon="alert"
+            iconColor={needsAttention(totals) > 0 ? "var(--status-critical)" : "var(--ink-2)"}
+            value={needsAttention(totals)}
             sub="crashed, failed or degraded"
           />
-          <StatTile label="Offline / removed" value={totals.offline} sub="service instances with nothing live" />
+          <StatTile label="Offline / removed" icon="moon" value={totals.offline} sub="nothing currently live" />
         </div>
       </div>
 
       {candidates.length > 0 && (
-        <Card>
+        <Card className="overflow-hidden">
           <CardHeader
-            title="Worth a look"
-            subtitle="Suggestions only — nothing changes until you open an item, review the plan and approve it."
+            title={<span className="flex items-center gap-2">Worth a look <Badge>{candidates.length}</Badge></span>}
+            subtitle="A few things to review. Every change still needs your approval."
           />
-          <ul className="divide-y divide-[var(--border)]">
+          <ul className="recommendations grid md:grid-cols-2">
             {candidates.slice(0, 10).map((c) => (
               <li key={c.key}>
-                <Link href={c.href} className="flex items-start gap-3 px-4 py-2.5 hover:bg-surface-2">
-                  <Icon
-                    name={c.icon}
-                    size={15}
-                    color={c.severity === 0 ? "var(--status-critical)" : c.severity === 1 ? "var(--status-warning)" : "var(--series-1)"}
-                    className="mt-0.5 shrink-0"
-                  />
+                <Link href={c.href} className="flex h-full items-start gap-3 px-5 py-4 transition-colors hover:bg-surface-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: c.severity === 0 ? "var(--danger-wash)" : c.severity === 1 ? "var(--warning-wash)" : "var(--info-wash)" }}>
+                    <Icon
+                      name={c.icon}
+                      size={15}
+                      color={c.severity === 0 ? "var(--status-critical)" : c.severity === 1 ? "var(--status-warning)" : "var(--series-1)"}
+                    />
+                  </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-sm font-medium">{c.title}</span>
-                    <span className="block text-xs text-ink-2">{c.detail}</span>
+                    <span className="mt-1 block text-xs leading-relaxed text-ink-2">{c.detail}</span>
                   </span>
                   <Icon name="chevron" size={14} className="mt-1 shrink-0 text-ink-2" />
                 </Link>
@@ -169,10 +176,11 @@ function WorkspaceSection({ bundle, showAccount }: { bundle: WorkspaceBundle; sh
   const included = figures.projection?.included ?? 0;
 
   return (
-    <Card>
+    <Card className="workspace-card overflow-hidden">
       <CardHeader
         title={
           <span className="flex flex-wrap items-center gap-2 text-base">
+            <span className="workspace-avatar" aria-hidden="true">{bundle.workspace.name.slice(0, 1).toUpperCase()}</span>
             {bundle.workspace.name}
             <PlanBadge plan={billing?.plan ?? bundle.workspace.plan} trial={billing?.isTrialing} />
             {showAccount && <span className="text-xs font-normal text-ink-2">via {bundle.account.label}</span>}
@@ -190,7 +198,7 @@ function WorkspaceSection({ bundle, showAccount }: { bundle: WorkspaceBundle; sh
         }
       />
 
-      <div className="grid gap-4 border-b border-line p-4 sm:grid-cols-3">
+      <div className="workspace-figures grid gap-5 border-b border-line p-5 sm:grid-cols-3">
         <div>
           <div className="text-xs text-ink-2">Usage so far</div>
           <div className="mt-0.5 text-xl font-semibold tabular">{money(figures.usageToDate)}</div>
