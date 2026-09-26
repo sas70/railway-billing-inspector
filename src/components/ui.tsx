@@ -7,8 +7,12 @@ import { Icon, type IconName } from "./Icon";
 
 // ── Layout primitives ───────────────────────────────────────────────────────
 
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`panel min-w-0 rounded-xl border border-line bg-surface ${className}`}>{children}</section>;
+export function Card({ children, className = "", ...rest }: React.ComponentProps<"section">) {
+  return (
+    <section className={`panel min-w-0 rounded-xl border border-line bg-surface ${className}`} {...rest}>
+      {children}
+    </section>
+  );
 }
 
 export function CardHeader({ title, subtitle, actions }: { title: React.ReactNode; subtitle?: React.ReactNode; actions?: React.ReactNode }) {

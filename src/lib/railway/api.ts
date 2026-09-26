@@ -13,6 +13,7 @@ import {
 } from "../billing";
 import { getAccount, getAccounts, type AccountConfig } from "../config";
 import { emptyHealthCounts, instanceHealth, type Health, type HealthCounts } from "../health";
+import { instanceDomains, pickPublicDomains } from "../railway-links";
 import { RailwayApiError, errorMessage, railwayRequest } from "./client";
 import * as D from "./documents";
 import type * as T from "./types";
@@ -138,6 +139,7 @@ export type InstanceSummary = {
   degraded: boolean;
   liveDeploymentIds: string[];
   latest: { id: string; status: T.DeploymentStatus; createdAt: string } | null;
+  publicDomains: string[];
 };
 
 export type EnvironmentSummary = { id: string; name: string; isEphemeral: boolean; instances: InstanceSummary[]; health: HealthCounts };
@@ -155,6 +157,7 @@ export type ProjectSummary = {
   environments: EnvironmentSummary[];
   health: HealthCounts;
   lastDeployAt: string | null;
+  publicDomains: string[];
 };
 
 function tally(counts: HealthCounts, instance: InstanceSummary) {
@@ -181,6 +184,7 @@ function summarizeProject(node: T.ProjectNode): ProjectSummary {
         latest: si.latestDeployment
           ? { id: si.latestDeployment.id, status: si.latestDeployment.status, createdAt: si.latestDeployment.createdAt }
           : null,
+        publicDomains: instanceDomains(si.domains),
       };
       tally(health, summary);
       tally(envHealth, summary);
@@ -204,6 +208,7 @@ function summarizeProject(node: T.ProjectNode): ProjectSummary {
     environments: sortEnvironments(environments, node.primaryEnvironmentId),
     health,
     lastDeployAt,
+    publicDomains: pickPublicDomains(environments.flatMap((env) => env.instances.flatMap((i) => i.publicDomains))),
   };
 }
 

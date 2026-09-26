@@ -106,6 +106,7 @@ export type ServiceInstanceLite = {
   environmentId: string;
   latestDeployment: (DeploymentLite & { createdAt: string }) | null;
   activeDeployments: DeploymentLite[];
+  domains?: { serviceDomains: { domain: string }[]; customDomains: { domain: string }[] };
 };
 
 export type ProjectNode = {

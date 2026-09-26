@@ -12,9 +12,10 @@ With it I took every project offline in one click, then turned back on only the 
 
 ![Services page after cleanup: 94 services, 1 online, 93 offline](docs/dashboard-after-cleanup.jpg)
 
-- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. **Rename** sits under each project name — two-word Railway slugs like `steadfast-fascination` are marked **generated name**. Enable Write mode, type a clearer name, then review and approve.
-- **Project.** Cost by service and by resource, a service table for each environment, volumes, and a danger zone.
-- **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, and the deployment history with bulk actions and logs.
+- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. Search covers every workspace and account (name, domain, service, project ID). Under each project name: the public `*.up.railway.app` (or custom) domain, then a red **Open in Railway** link to `https://railway.com/project/<id>` so you can jump straight into Railway's dashboard. **Rename** sits under that — two-word Railway slugs like `steadfast-fascination` are marked **generated name**. Enable Write mode, type a clearer name, then review and approve.
+- **Services.** Every service across every workspace. Default sort is **newest deploy first**. Click a column (service, status, environment, latest deploy, this period, expected) to sort. Search and All / Online / Offline still apply. Each row has a red **Open in Railway** icon next to the service name that opens that service in Railway (`/project/…/service/…`).
+- **Project.** Cost by service and by resource, a service table for each environment, volumes, a red **Open in Railway** link, and a danger zone.
+- **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, the deployment history with bulk actions and logs, and a red **Open in Railway** link for that service.
 - **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits, the next invoice, invoices with PDF links, and cost by project and resource. Also available for the previous period.
 - **Cost history.** Open **Billing → Cost history** to compare the last 7 or 30 complete UTC days with the preceding equal window. Projects are ranked by absolute spending change, with dollar and percentage differences, increase/decrease filters, search, and expandable resource changes. Deleted projects are included; workspaces missing either range are excluded from both totals. This compares metered resource costs at current list prices, excluding plan fees, included usage, credits and tax. Today is excluded to avoid comparing a partial day.
 - **Audit log.** Every approved action, with the phrase used to approve it and Railway's answer. You can export it as CSV and cancel scheduled project deletions from here.
@@ -153,7 +154,8 @@ This validates every GraphQL operation the dashboard sends (25 of them) against 
 ```
 src/
   app/
-    page.tsx                         Overview (includes project rename)
+    page.tsx                         Overview (search, Railway links, project rename)
+    services/page.tsx                Services catalog (sortable, Railway links)
     billing/page.tsx                 Billing (current / previous period)
     a/[account]/p/[project]/page.tsx Project drill-down
     a/[account]/p/[project]/s/[service]/page.tsx   Service: metrics, deployments, logs
@@ -162,13 +164,14 @@ src/
   lib/
     plans.ts                         Approval engine (review, gating, phrase, expiry, re-check, audit)
     project-name.ts                  Detects Railway-generated adjective-noun project names
+    railway-links.ts                 railway.com project and service dashboard URLs
     railway/documents.ts             Every GraphQL query/mutation (validated by check:queries; includes projectUpdate)
     railway/client.ts                Transport: auth, 30 s cache, concurrency, retries, errors
     railway/api.ts                   Data loading + usage aggregation
     railway/mock.ts                  Demo-mode fake Railway
     billing.ts                       Unit prices, cost math, plan terms, periods
     audit.ts, config.ts, health.ts, format.ts
-  components/                        UI (review dialog, ProjectRename, deployment history, charts, …)
+  components/                        UI (review dialog, ProjectRename, OverviewSearch, RailwayLink, ServicesTable, charts, …)
   proxy.ts                           Optional password gate
 scripts/check-queries.mjs            Live schema validation
 ```

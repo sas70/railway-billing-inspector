@@ -1,9 +1,21 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { ActionButton } from "@/components/ActionReview";
 import { Icon } from "@/components/Icon";
+import { RailwayLink } from "@/components/RailwayLink";
 import { Badge, EmptyState, HealthPill, Money } from "@/components/ui";
 import type { ServiceCatalogRow } from "@/lib/service-row";
+import { railwayServiceUrl } from "@/lib/railway-links";
+import {
+  DEFAULT_SERVICE_SORT,
+  nextServiceSort,
+  sortServiceRows,
+  type ServiceSort,
+  type ServiceSortKey,
+} from "@/lib/service-stats";
 
 function lockReason(row: ServiceCatalogRow, readOnly: boolean): string | undefined {
   if (readOnly) return "Read-only — enable Write mode in the header";
@@ -11,43 +23,73 @@ function lockReason(row: ServiceCatalogRow, readOnly: boolean): string | undefin
   return undefined;
 }
 
+function SortHeader({
+  label,
+  column,
+  sort,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  column: ServiceSortKey;
+  sort: ServiceSort;
+  onSort: (column: ServiceSortKey) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === column;
+  return (
+    <th
+      scope="col"
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+      className={`px-2 py-2 font-medium ${align === "right" ? "text-right" : "text-left"} ${column === "service" ? "px-4" : ""}`}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`inline-flex items-center gap-1 rounded-sm hover:text-ink ${align === "right" ? "flex-row-reverse" : ""} ${active ? "text-ink" : ""}`}
+      >
+        {label}
+        <Icon
+          name="chevron"
+          size={11}
+          className={active ? (sort.dir === "desc" ? "rotate-90" : "-rotate-90") : "rotate-90 opacity-30"}
+        />
+      </button>
+    </th>
+  );
+}
+
 export function ServicesTable({ rows, readOnly }: { rows: ServiceCatalogRow[]; readOnly: boolean }) {
+  const [sort, setSort] = useState(DEFAULT_SERVICE_SORT);
+  const sorted = useMemo(() => sortServiceRows(rows, sort), [rows, sort]);
   const allEnvsNote = rows.some((r) => r.costIsAllEnvs);
+
+  function onSort(column: ServiceSortKey) {
+    setSort((current) => nextServiceSort(current, column));
+  }
 
   return (
     <div>
-      {rows.length === 0 ? (
+      {sorted.length === 0 ? (
         <EmptyState>No services in any workspace.</EmptyState>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full min-w-[960px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-xs text-ink-2">
-                <th scope="col" className="px-4 py-2 font-medium">
-                  Service
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  Status
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  Environment
-                </th>
-                <th scope="col" className="px-2 py-2 font-medium">
-                  Latest deploy
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">
-                  This period
-                </th>
-                <th scope="col" className="px-2 py-2 text-right font-medium">
-                  Expected
-                </th>
+                <SortHeader label="Service" column="service" sort={sort} onSort={onSort} />
+                <SortHeader label="Status" column="status" sort={sort} onSort={onSort} />
+                <SortHeader label="Environment" column="environment" sort={sort} onSort={onSort} />
+                <SortHeader label="Latest deploy" column="latest" sort={sort} onSort={onSort} />
+                <SortHeader label="This period" column="period" sort={sort} onSort={onSort} align="right" />
+                <SortHeader label="Expected" column="expected" sort={sort} onSort={onSort} align="right" />
                 <th scope="col" className="px-4 py-2 text-right font-medium">
                   <span className="sr-only">Actions</span>
                 </th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
+              {sorted.map((row) => {
                 const lock = lockReason(row, readOnly);
                 const canOff = row.online && row.liveDeploymentIds.length > 0 && row.health !== "deploying";
                 const offReason =
@@ -70,9 +112,15 @@ export function ServicesTable({ rows, readOnly }: { rows: ServiceCatalogRow[]; r
                     className="border-b border-line last:border-b-0 hover:bg-surface-2"
                   >
                     <td className="px-4 py-2.5 align-top">
-                      <Link href={row.href} className="font-medium hover:underline underline-offset-2">
-                        {row.serviceName}
-                      </Link>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <Link href={row.href} className="font-medium hover:underline underline-offset-2">
+                          {row.serviceName}
+                        </Link>
+                        <RailwayLink
+                          href={railwayServiceUrl(row.projectId, row.serviceId, row.environmentId)}
+                          compact
+                        />
+                      </div>
                       <div className="mt-0.5 text-xs text-ink-2">
                         {row.workspaceName} · {row.projectName}
                       </div>

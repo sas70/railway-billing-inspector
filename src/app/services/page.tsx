@@ -29,7 +29,7 @@ export default async function ServicesPage() {
     <div className="space-y-6">
       <PageTitle
         title="Services"
-        subtitle="Every service across every workspace, sorted by expected cost this period. Turn one off or on — you'll review the plan before anything changes."
+        subtitle="Every service across every workspace, newest deploy first. Click a column to sort by cost, status, or name. Turn one off or on — you'll review the plan before anything changes."
       />
 
       {accounts

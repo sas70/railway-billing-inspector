@@ -164,6 +164,14 @@ query WorkspaceProjects($workspaceId: String!, $after: String) {
                       status
                       deploymentStopped
                     }
+                    domains {
+                      serviceDomains {
+                        domain
+                      }
+                      customDomains {
+                        domain
+                      }
+                    }
                   }
                 }
               }

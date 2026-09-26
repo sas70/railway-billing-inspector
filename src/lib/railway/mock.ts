@@ -811,6 +811,10 @@ function projectNode(project: MProject): T.ProjectNode {
               activeDeployments: i.deployments
                 .filter((d) => i.activeIds.includes(d.id))
                 .map((d) => ({ id: d.id, status: d.status, deploymentStopped: d.deploymentStopped })),
+              domains: {
+                serviceDomains: i.domains.map((domain) => ({ domain })),
+                customDomains: [],
+              },
             };
           }),
         ),

@@ -6,6 +6,8 @@ import { connection } from "next/server";
 import { ActionButton } from "@/components/ActionReview";
 import { ErrorState } from "@/components/ErrorState";
 import { Icon } from "@/components/Icon";
+import { RailwayLink } from "@/components/RailwayLink";
+import { railwayProjectUrl } from "@/lib/railway-links";
 import {
   Badge,
   BarList,
@@ -110,7 +112,12 @@ export default async function ProjectPage({ params, searchParams }: Props) {
               {project.deletedAt && <Badge tone="danger">deletion scheduled</Badge>}
             </>
           }
-          subtitle={[project.description, `created ${dateShort(project.createdAt)}`].filter(Boolean).join(" · ")}
+          subtitle={
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>{[project.description, `created ${dateShort(project.createdAt)}`].filter(Boolean).join(" · ")}</span>
+              <RailwayLink href={railwayProjectUrl(project.id)} />
+            </span>
+          }
         />
       </div>
 

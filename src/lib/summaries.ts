@@ -4,6 +4,7 @@ import { money, plural, relative } from "./format";
 import { isOnlineHealth } from "./health";
 import type { ProjectSummary, ProjectUsage, WorkspaceBundle } from "./railway/api";
 import type { ServiceCatalogRow } from "./service-row";
+import { DEFAULT_SERVICE_SORT, sortServiceRows } from "./service-stats";
 
 export type { ServiceCatalogRow };
 
@@ -111,7 +112,7 @@ function scaleExpected(periodCost: number, projectPeriod: number, projectProject
   return periodCost * (projectProjected / projectPeriod);
 }
 
-/** Every service instance across every workspace, sorted by expected $ (high → low). */
+/** Every service instance across every workspace, newest deploy first. */
 export function serviceCatalog(bundles: WorkspaceBundle[]): ServiceCatalogRow[] {
   const rows: ServiceCatalogRow[] = [];
   for (const bundle of bundles) {
@@ -166,13 +167,5 @@ export function serviceCatalog(bundles: WorkspaceBundle[]): ServiceCatalogRow[] 
     }
   }
 
-  return rows.sort((a, b) => {
-    const ae = a.expectedCost ?? -1;
-    const be = b.expectedCost ?? -1;
-    if (be !== ae) return be - ae;
-    const ap = a.periodCost ?? -1;
-    const bp = b.periodCost ?? -1;
-    if (bp !== ap) return bp - ap;
-    return a.serviceName.localeCompare(b.serviceName) || a.projectName.localeCompare(b.projectName);
-  });
+  return sortServiceRows(rows, DEFAULT_SERVICE_SORT);
 }

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Icon } from "@/components/Icon";
+import { OverviewSearch } from "@/components/OverviewSearch";
+import { ProjectLinks } from "@/components/ProjectLinks";
 import { ProjectRename } from "@/components/ProjectRename";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
@@ -83,9 +85,10 @@ export default async function OverviewPage() {
     <div className="space-y-6">
       <PageTitle
         title="Overview"
-        subtitle={`Your infrastructure, at a glance. Costs and service health across ${plural(workspaceCount, "workspace")}. Rename a Railway-assigned project name here after enabling Write mode.`}
+        subtitle={`Your infrastructure, at a glance. Costs and service health across ${plural(workspaceCount, "workspace")}. Search every workspace. Each project lists its public *.up.railway.app URL and a direct Railway dashboard link.`}
         actions={<Link href="/services" className={buttonClass("neutral", "md")}>Explore services <Icon name="chevron" size={14} /></Link>}
       />
+      <OverviewSearch totalProjects={projectCount} />
 
       {accounts
         .filter((a) => a.error)
@@ -192,7 +195,7 @@ function WorkspaceSection({
   const included = figures.projection?.included ?? 0;
 
   return (
-    <Card className="workspace-card overflow-hidden">
+    <Card className="workspace-card overflow-hidden" data-workspace-section>
       <CardHeader
         title={
           <span className="flex flex-wrap items-center gap-2 text-base">
@@ -278,8 +281,24 @@ function WorkspaceSection({
                 const href = `/a/${bundle.account.key}/p/${project.id}`;
                 const cost = projectCost(figures, project);
                 const prEnvs = project.environments.filter((e) => e.isEphemeral).length;
+                const search = [
+                  project.name,
+                  project.description ?? "",
+                  bundle.workspace.name,
+                  bundle.account.label,
+                  ...project.environments.flatMap((e) => e.instances.map((i) => i.serviceName)),
+                  ...project.publicDomains,
+                  project.id,
+                ]
+                  .join(" ")
+                  .toLowerCase();
                 return (
-                  <tr key={project.id} className="border-b border-line last:border-b-0 hover:bg-surface-2">
+                  <tr
+                    key={project.id}
+                    data-project-row
+                    data-search={search}
+                    className="border-b border-line last:border-b-0 hover:bg-surface-2"
+                  >
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap items-center gap-1.5">
                         <Link href={href} className="font-medium hover:underline underline-offset-2">
@@ -293,6 +312,7 @@ function WorkspaceSection({
                         {project.deletedAt && <Badge tone="danger">deletion scheduled</Badge>}
                       </div>
                       {project.description && <div className="max-w-xs truncate text-xs text-ink-2">{project.description}</div>}
+                      <ProjectLinks publicDomains={project.publicDomains} projectId={project.id} />
                       <ProjectRename
                         accountKey={bundle.account.key}
                         projectId={project.id}

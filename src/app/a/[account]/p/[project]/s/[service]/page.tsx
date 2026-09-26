@@ -7,6 +7,8 @@ import { ActionButton } from "@/components/ActionReview";
 import { DeploymentHistory, type DeploymentRowView } from "@/components/DeploymentHistory";
 import { ErrorState } from "@/components/ErrorState";
 import { Icon } from "@/components/Icon";
+import { RailwayLink } from "@/components/RailwayLink";
+import { railwayServiceUrl } from "@/lib/railway-links";
 import { TimeSeriesChart } from "@/components/TimeSeriesChart";
 import {
   Badge,
@@ -177,6 +179,7 @@ export default async function ServicePage({ params, searchParams }: Props) {
                     {domain} <Icon name="external" size={11} />
                   </a>
                 ))}
+                <RailwayLink href={railwayServiceUrl(project.id, service.id, env.id)} />
               </span>
             ) : undefined
           }

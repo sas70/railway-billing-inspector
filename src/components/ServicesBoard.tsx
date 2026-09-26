@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 
 import { BulkMasterButtons } from "@/components/BulkMaster";
 import { MiniHistogram, MiniPie } from "@/components/MiniCharts";
@@ -27,14 +27,14 @@ export function ServicesBoard({
   const stats = serviceStats(visible);
   const filtered = filter !== "all" || q.length > 0;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const nodes = document.querySelectorAll<HTMLTableRowElement>("[data-service-row]");
     for (const node of nodes) {
       const online = node.dataset.online === "1";
       const hay = node.dataset.search ?? "";
       node.hidden = !((filter === "all" || (filter === "online") === online) && (!q || hay.includes(q)));
     }
-  }, [q, filter]);
+  });
 
   const scope = filter === "online" ? "online services" : filter === "offline" ? "offline services" : "visible services";
 
