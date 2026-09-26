@@ -529,6 +529,14 @@ mutation EnvironmentDelete($id: String!) {
   environmentDelete(id: $id)
 }`);
 
+export const ProjectUpdate = m("ProjectUpdate", /* GraphQL */ `
+mutation ProjectUpdate($id: String!, $input: ProjectUpdateInput!) {
+  projectUpdate(id: $id, input: $input) {
+    id
+    name
+  }
+}`);
+
 export const ProjectScheduleDelete = m("ProjectScheduleDelete", /* GraphQL */ `
 mutation ProjectScheduleDelete($id: String!) {
   projectScheduleDelete(id: $id)

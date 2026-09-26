@@ -12,7 +12,7 @@ With it I took every project offline in one click, then turned back on only the 
 
 ![Services page after cleanup: 94 services, 1 online, 93 offline](docs/dashboard-after-cleanup.jpg)
 
-- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money.
+- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. **Rename** sits under each project name — two-word Railway slugs like `steadfast-fascination` are marked **generated name**. Enable Write mode, type a clearer name, then review and approve.
 - **Project.** Cost by service and by resource, a service table for each environment, volumes, and a danger zone.
 - **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, and the deployment history with bulk actions and logs.
 - **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits, the next invoice, invoices with PDF links, and cost by project and resource. Also available for the previous period.
@@ -32,6 +32,20 @@ With it I took every project offline in one click, then turned back on only the 
 
 To try it without a token, run `npm run demo`. It uses built-in fake data, and nothing is sent to Railway.
 For everyday use you can run `npm run build` once, then `npm start`, which is faster than dev mode.
+
+### Publishing updates (maintainer)
+
+Work in this local folder. If GitHub has new PRs, pull them in **before** you publish, or you will overwrite the contributor.
+
+```bash
+npm run pull:public                  # bring merged PRs into this folder
+# edit and test at http://127.0.0.1:3100
+git add -A && git commit -m "your message"
+git push origin main                 # private backup
+npm run publish:public               # public repo + Vercel demo
+```
+
+Do not `git push` this repo's `main` to the public project. Older private commits still contain a Railway token. The publish script copies the current source only (never `.env`).
 
 ---
 
@@ -53,6 +67,10 @@ Every change, from restarting a deployment to deleting a project, goes through t
 
 The "Worth a look" suggestions only link to the right page. Nothing in the app acts on its own.
 
+### Rename a project
+
+On **Overview**, under the project name, click **Rename**. Railway-assigned names (`adjective-noun`) show a **generated name** badge. Type the name you want (1–64 characters), click **Review**, then confirm. That calls Railway `projectUpdate`. It does not change services, domains, or cost. Protected projects and read-only mode stay locked. You can rename again later.
+
 ### What each action does
 
 | Action | Railway API | Effect on cost | Undo |
@@ -63,6 +81,7 @@ The "Worth a look" suggestions only link to the right page. Nothing in the app a
 | Cancel build | `deploymentCancel` | none | Redeploy |
 | **Delete service** (from one environment) | `serviceDelete(id, environmentId)` | Stops its charges in that environment. Volume data should be treated as gone. | Not reversible |
 | **Delete environment** (not the primary one) | `environmentDelete` | Stops everything in it. Good for forgotten PR environments. | Not reversible |
+| **Rename project** (Overview) | `projectUpdate` | none | Rename it again |
 | **Delete project** | `projectScheduleDelete` | Railway deletes the project after a **48-hour grace period** | Cancel within 48 h (Audit log page or Railway), which calls `projectScheduleDeleteCancel` |
 
 > Railway keeps removed deployments in the history list. Removing a deployment that isn't running doesn't lower your bill: costs come from running services (CPU/RAM), volume storage and egress. To save money, take idle services offline, delete PR environments, or delete projects you no longer need.
@@ -134,7 +153,7 @@ This validates every GraphQL operation the dashboard sends (25 of them) against 
 ```
 src/
   app/
-    page.tsx                         Overview
+    page.tsx                         Overview (includes project rename)
     billing/page.tsx                 Billing (current / previous period)
     a/[account]/p/[project]/page.tsx Project drill-down
     a/[account]/p/[project]/s/[service]/page.tsx   Service: metrics, deployments, logs
@@ -142,13 +161,14 @@ src/
     actions.ts                       Server Actions: create plan → execute plan, logs, refresh
   lib/
     plans.ts                         Approval engine (review, gating, phrase, expiry, re-check, audit)
-    railway/documents.ts             Every GraphQL query/mutation (validated by check:queries)
+    project-name.ts                  Detects Railway-generated adjective-noun project names
+    railway/documents.ts             Every GraphQL query/mutation (validated by check:queries; includes projectUpdate)
     railway/client.ts                Transport: auth, 30 s cache, concurrency, retries, errors
     railway/api.ts                   Data loading + usage aggregation
     railway/mock.ts                  Demo-mode fake Railway
     billing.ts                       Unit prices, cost math, plan terms, periods
     audit.ts, config.ts, health.ts, format.ts
-  components/                        UI (review dialog, deployment history, charts, …)
+  components/                        UI (review dialog, ProjectRename, deployment history, charts, …)
   proxy.ts                           Optional password gate
 scripts/check-queries.mjs            Live schema validation
 ```

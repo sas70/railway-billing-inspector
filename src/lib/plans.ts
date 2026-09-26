@@ -30,6 +30,7 @@ import { clearCache, railwayRequest } from "./railway/client";
 import * as D from "./railway/documents";
 import { RailwayApiError } from "./railway/errors";
 import type { DeploymentReviewNode } from "./railway/types";
+import { isGeneratedRailwayName } from "./project-name";
 
 /**
  * The approval engine.
@@ -75,6 +76,8 @@ type StoredPlan = {
   serviceName?: string;
   /** Deployment kinds: was each runnable deployment live when reviewed? */
   reviewedLive: Record<string, boolean>;
+  /** project.rename: the name the review approved. */
+  proposedName?: string;
   expiresAtMs: number;
 };
 
@@ -109,7 +112,16 @@ export function parsePlanRequest(input: unknown): PlanRequest {
   if (raw.targetIds.length === 0 && !allowEmptyTargets) throw new UserFacingError("Nothing selected.");
   const targetIds = [...new Set(raw.targetIds.map((t) => id(t, "target")!))];
   if (targetIds.length > MAX_TARGETS) throw new UserFacingError(`Select at most ${MAX_TARGETS} items at a time.`);
-  return { accountKey: raw.accountKey, kind, projectId, environmentId, serviceId, targetIds };
+  const newName = kind === "project.rename" ? parseProjectName(raw.newName) : undefined;
+  return { accountKey: raw.accountKey, kind, projectId, environmentId, serviceId, targetIds, newName };
+}
+
+export function parseProjectName(value: unknown): string {
+  if (typeof value !== "string") throw new UserFacingError("Enter a new project name.");
+  const name = value.trim().replace(/\s+/g, " ");
+  if (name.length < 1 || name.length > 64) throw new UserFacingError("Name must be 1–64 characters.");
+  if (/[\u0000-\u001f\u007f]/.test(name)) throw new UserFacingError("Name contains invalid characters.");
+  return name;
 }
 
 // ── Gating rules ────────────────────────────────────────────────────────────
@@ -400,6 +412,35 @@ function draftCancelDelete(projectId: string, projectName: string): Draft {
   };
 }
 
+function draftProjectRename(project: ProjectDetail, newName: string): Draft {
+  const same = project.name === newName;
+  const generated = isGeneratedRailwayName(project.name);
+  return {
+    title: `Rename ${project.name} → ${newName}`,
+    verb: "Rename",
+    items: [
+      {
+        targetId: project.id,
+        label: `${project.name} → ${newName}`,
+        detail: generated ? "Current name looks Railway-assigned" : undefined,
+        flags: generated ? [{ tone: "info", text: "Generated name" }] : [],
+        willRun: !same && !project.deletedAt,
+        skipReason: project.deletedAt
+          ? "Scheduled for deletion — cancel that first."
+          : same
+            ? "Already named that."
+            : undefined,
+      },
+    ],
+    impact: [
+      `Changes the Railway project name from “${project.name}” to “${newName}”.`,
+      "Services, domains, deployments and billing stay the same. Only the display name changes.",
+    ],
+    recovery: "Rename it again from Overview if you want a different name.",
+    blockedReason: project.deletedAt ? "This project is scheduled for deletion." : undefined,
+  };
+}
+
 // ── Shared checks (run at review time and again at execution time) ──────────
 
 /** Why this plan must not run right now, if anything. Cancelling a deletion is always allowed. */
@@ -436,7 +477,10 @@ export async function createPlan(input: unknown): Promise<PlanView> {
   if (project && !workspaceAllowed(account, project.workspace?.id)) {
     throw new UserFacingError("This token is limited to a different workspace (RAILWAY_TOKEN_…_WORKSPACE_ID).");
   }
-  if ((req.kind === "project.scheduleDelete" || req.kind === "project.cancelDelete") && req.targetIds[0] !== req.projectId) {
+  if (
+    (req.kind === "project.scheduleDelete" || req.kind === "project.cancelDelete" || req.kind === "project.rename") &&
+    req.targetIds[0] !== req.projectId
+  ) {
     throw new UserFacingError("Project mismatch.");
   }
 
@@ -444,6 +488,7 @@ export async function createPlan(input: unknown): Promise<PlanView> {
   if (req.kind.startsWith("deployment.")) draft = await draftDeploymentPlan(account, req, project!);
   else if (req.kind === "service.delete") draft = await draftServiceDelete(account, req, project!);
   else if (req.kind === "environment.delete") draft = await draftEnvironmentDelete(account, req, project!);
+  else if (req.kind === "project.rename") draft = draftProjectRename(project!, req.newName!);
   else if (req.kind === "project.scheduleDelete") draft = draftProjectDelete(project!);
   else draft = draftCancelDelete(req.projectId, projectName);
 
@@ -494,6 +539,7 @@ export async function createPlan(input: unknown): Promise<PlanView> {
     serviceId: draft.serviceId,
     serviceName: draft.serviceName,
     reviewedLive: draft.reviewedLive ?? {},
+    proposedName: req.newName,
     expiresAtMs,
   });
 
@@ -545,6 +591,14 @@ async function runMutation(account: AccountConfig, plan: StoredPlan, targetId: s
       expectTrue(r.environmentDelete, "environmentDelete");
       return undefined;
     }
+    case "project.rename": {
+      if (!plan.proposedName) throw new Error("Missing name.");
+      const r = await railwayRequest<{ projectUpdate: { id: string; name: string } }>(account, D.ProjectUpdate, {
+        id: targetId,
+        input: { name: plan.proposedName },
+      });
+      return `Now named ${r.projectUpdate.name}`;
+    }
     case "project.scheduleDelete": {
       const r = await railwayRequest<{ projectScheduleDelete: boolean }>(account, D.ProjectScheduleDelete, { id: targetId });
       expectTrue(r.projectScheduleDelete, "projectScheduleDelete");
@@ -592,6 +646,12 @@ async function recheckItem(
     const env = project?.environments.find((e) => e.id === targetId);
     if (!env) return "The environment no longer exists.";
     if (env.id === project?.primaryEnvironmentId) return "It is now the project's primary environment.";
+    return null;
+  }
+  if (kind === "project.rename") {
+    if (!project) return "The project could not be re-read.";
+    if (project.deletedAt) return "The project is scheduled for deletion.";
+    if (plan.proposedName && project.name === plan.proposedName) return "Already named that.";
     return null;
   }
   if (kind === "project.scheduleDelete") {

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Icon } from "@/components/Icon";
+import { ProjectRename } from "@/components/ProjectRename";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
 import {
@@ -19,6 +20,7 @@ import {
   StatTile,
 } from "@/components/ui";
 import { isProtectedProject, unmatchedProtectedEntries } from "@/lib/config";
+import { isReadOnly } from "@/lib/write-mode";
 import { dateNoYear, money, plural, relative } from "@/lib/format";
 import { emptyHealthCounts, needsAttention } from "@/lib/health";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
@@ -28,6 +30,7 @@ export const metadata: Metadata = { title: "Overview" };
 
 export default async function OverviewPage() {
   await connection();
+  const readOnly = await isReadOnly();
   const accounts = await loadAccountViews();
   if (accounts.length === 0) return <SetupGuide />;
 
@@ -80,7 +83,7 @@ export default async function OverviewPage() {
     <div className="space-y-6">
       <PageTitle
         title="Overview"
-        subtitle={`Your infrastructure, at a glance. Costs and service health across ${plural(workspaceCount, "workspace")}.`}
+        subtitle={`Your infrastructure, at a glance. Costs and service health across ${plural(workspaceCount, "workspace")}. Rename a Railway-assigned project name here after enabling Write mode.`}
         actions={<Link href="/services" className={buttonClass("neutral", "md")}>Explore services <Icon name="chevron" size={14} /></Link>}
       />
 
@@ -162,13 +165,26 @@ export default async function OverviewPage() {
       )}
 
       {bundles.map((bundle) => (
-        <WorkspaceSection key={`${bundle.account.key}-${bundle.workspace.id}`} bundle={bundle} showAccount={accounts.length > 1} />
+        <WorkspaceSection
+          key={`${bundle.account.key}-${bundle.workspace.id}`}
+          bundle={bundle}
+          showAccount={accounts.length > 1}
+          readOnly={readOnly}
+        />
       ))}
     </div>
   );
 }
 
-function WorkspaceSection({ bundle, showAccount }: { bundle: WorkspaceBundle; showAccount: boolean }) {
+function WorkspaceSection({
+  bundle,
+  showAccount,
+  readOnly,
+}: {
+  bundle: WorkspaceBundle;
+  showAccount: boolean;
+  readOnly: boolean;
+}) {
   const figures = workspaceFigures(bundle);
   const billing = bundle.billing.ok ? bundle.billing.value : null;
   const projects = bundle.projects.ok ? bundle.projects.value : [];
@@ -277,6 +293,19 @@ function WorkspaceSection({ bundle, showAccount }: { bundle: WorkspaceBundle; sh
                         {project.deletedAt && <Badge tone="danger">deletion scheduled</Badge>}
                       </div>
                       {project.description && <div className="max-w-xs truncate text-xs text-ink-2">{project.description}</div>}
+                      <ProjectRename
+                        accountKey={bundle.account.key}
+                        projectId={project.id}
+                        currentName={project.name}
+                        readOnly={readOnly}
+                        lockedReason={
+                          isProtectedProject(project)
+                            ? `${project.name} is listed in PROTECTED_PROJECTS`
+                            : project.deletedAt
+                              ? "Scheduled for deletion"
+                              : undefined
+                        }
+                      />
                     </td>
                     <td className="px-2 py-2.5">
                       <HealthSummary counts={project.health} />

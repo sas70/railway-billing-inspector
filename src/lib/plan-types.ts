@@ -8,6 +8,7 @@ export const PLAN_KINDS = [
   "deployment.cancel",
   "service.delete",
   "environment.delete",
+  "project.rename",
   "project.scheduleDelete",
   "project.cancelDelete",
 ] as const;
@@ -22,6 +23,8 @@ export type PlanRequest = {
   environmentId?: string;
   serviceId?: string;
   targetIds: string[];
+  /** Required for project.rename — the name Railway should use after approval. */
+  newName?: string;
 };
 
 export type PlanFlag = { tone: "danger" | "warning" | "info"; text: string };

@@ -1184,6 +1184,15 @@ const HANDLERS: Record<string, Handler> = {
     throw notFound("Environment", op);
   },
 
+  ProjectUpdate: (w, v, op) => {
+    const project = findProject(w, v.id, op);
+    const input = v.input as { name?: unknown } | undefined;
+    const name = typeof input?.name === "string" ? input.name.trim() : "";
+    if (!name) throw refuse("Project name is required", op);
+    project.name = name;
+    return { projectUpdate: { id: project.id, name: project.name } };
+  },
+
   ProjectScheduleDelete: (w, v, op) => {
     const project = findProject(w, v.id, op);
     project.deletedAt = iso(Date.now());

@@ -10,7 +10,9 @@
     "start": "next start -H 127.0.0.1 -p 3100",
     "typecheck": "next typegen && tsc --noEmit",
     "test:cost-history": "node --test scripts/test-cost-history.mjs",
-    "check:queries": "node scripts/check-queries.mjs"
+    "check:queries": "node scripts/check-queries.mjs",
+    "pull:public": "bash scripts/pull-public.sh",
+    "publish:public": "bash scripts/publish-public.sh"
   },
   "dependencies": {
     "next": "16.3.6",

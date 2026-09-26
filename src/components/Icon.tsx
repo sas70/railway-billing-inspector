@@ -19,7 +19,8 @@ export type IconName =
   | "layers"
   | "trend"
   | "search"
-  | "wallet";
+  | "wallet"
+  | "pencil";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
@@ -131,6 +132,12 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <rect x="2" y="6" width="20" height="14" rx="2" />
       <path d="M2 10h20" />
       <circle cx="16" cy="15" r="1.2" fill="currentColor" stroke="none" />
+    </>
+  ),
+  pencil: (
+    <>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
     </>
   ),
 };

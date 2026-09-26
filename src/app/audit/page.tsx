@@ -22,6 +22,7 @@ const KIND_LABEL: Record<PlanKind, string> = {
   "deployment.cancel": "Cancel build",
   "service.delete": "Delete service",
   "environment.delete": "Delete environment",
+  "project.rename": "Rename project",
   "project.scheduleDelete": "Schedule project deletion",
   "project.cancelDelete": "Cancel project deletion",
 };
