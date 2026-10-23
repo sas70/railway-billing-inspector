@@ -104,6 +104,7 @@ export type ServiceInstanceLite = {
   serviceId: string;
   serviceName: string;
   environmentId: string;
+  source?: { repo: string | null } | null;
   latestDeployment: (DeploymentLite & { createdAt: string }) | null;
   activeDeployments: DeploymentLite[];
   domains?: { serviceDomains: { domain: string }[]; customDomains: { domain: string }[] };

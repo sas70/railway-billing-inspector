@@ -11,6 +11,7 @@ import {
   type Period,
   type UsageTotals,
 } from "../billing";
+import { normalizeRepo } from "../code/sources";
 import { getAccount, getAccounts, type AccountConfig } from "../config";
 import { emptyHealthCounts, instanceHealth, type Health, type HealthCounts } from "../health";
 import { instanceDomains, pickPublicDomains } from "../railway-links";
@@ -140,6 +141,8 @@ export type InstanceSummary = {
   liveDeploymentIds: string[];
   latest: { id: string; status: T.DeploymentStatus; createdAt: string } | null;
   publicDomains: string[];
+  /** GitHub `owner/name` this instance deploys from, if any. */
+  repo: string | null;
 };
 
 export type EnvironmentSummary = { id: string; name: string; isEphemeral: boolean; instances: InstanceSummary[]; health: HealthCounts };
@@ -158,6 +161,8 @@ export type ProjectSummary = {
   health: HealthCounts;
   lastDeployAt: string | null;
   publicDomains: string[];
+  /** Distinct GitHub repos (`owner/name`) the project's services deploy from. */
+  repos: string[];
 };
 
 function tally(counts: HealthCounts, instance: InstanceSummary) {
@@ -185,6 +190,7 @@ function summarizeProject(node: T.ProjectNode): ProjectSummary {
           ? { id: si.latestDeployment.id, status: si.latestDeployment.status, createdAt: si.latestDeployment.createdAt }
           : null,
         publicDomains: instanceDomains(si.domains),
+        repo: si.source?.repo ? normalizeRepo(si.source.repo) : null,
       };
       tally(health, summary);
       tally(envHealth, summary);
@@ -209,6 +215,7 @@ function summarizeProject(node: T.ProjectNode): ProjectSummary {
     health,
     lastDeployAt,
     publicDomains: pickPublicDomains(environments.flatMap((env) => env.instances.flatMap((i) => i.publicDomains))),
+    repos: [...new Set(environments.flatMap((env) => env.instances.flatMap((i) => (i.repo ? [i.repo] : []))))].sort(),
   };
 }
 

@@ -108,3 +108,30 @@ export async function setWriteModeAction(enabled: unknown): Promise<ActionResult
     return { ok: false, error: toMessage(error) };
   }
 }
+
+/**
+ * Start AI summaries of every project's repo in the background. "missing" covers repos with no
+ * summary or whose code changed since; "all" re-summarizes everything. Railway is only read.
+ */
+export async function startSummariesAction(mode: unknown): Promise<ActionResult<{ started: boolean; count: number }>> {
+  try {
+    if (mode !== "missing" && mode !== "all") throw new UserFacingError("Unknown summary mode.");
+    const { aiSummariesAvailable, startSummaryJob, summaryStatuses } = await import("@/lib/code/ai-summary");
+    const { repoKey } = await import("@/lib/code/sources");
+    if (!aiSummariesAvailable()) throw new UserFacingError("Set ANTHROPIC_API_KEY in .env.local to turn on AI summaries.");
+    const { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets } = await import("@/lib/railway/api");
+    const bundles = await Promise.all(uniqueWorkspaceTargets(await loadAccountViews()).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace)));
+    const repos = [...new Set(bundles.flatMap((b) => (b.projects.ok ? b.projects.value.flatMap((p) => p.repos) : [])))];
+    let todo = repos;
+    if (mode === "missing") {
+      const statuses = await summaryStatuses(repos);
+      todo = repos.filter((r) => {
+        const s = statuses.get(repoKey(r));
+        return s && (!s.stored || s.stale);
+      });
+    }
+    return { ok: true, data: { started: startSummaryJob(todo, mode === "all"), count: todo.length } };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}

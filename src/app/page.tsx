@@ -288,6 +288,7 @@ function WorkspaceSection({
                   bundle.account.label,
                   ...project.environments.flatMap((e) => e.instances.map((i) => i.serviceName)),
                   ...project.publicDomains,
+                  ...project.repos,
                   project.id,
                 ]
                   .join(" ")
@@ -312,7 +313,7 @@ function WorkspaceSection({
                         {project.deletedAt && <Badge tone="danger">deletion scheduled</Badge>}
                       </div>
                       {project.description && <div className="max-w-xs truncate text-xs text-ink-2">{project.description}</div>}
-                      <ProjectLinks publicDomains={project.publicDomains} projectId={project.id} />
+                      <ProjectLinks publicDomains={project.publicDomains} projectId={project.id} repos={project.repos} />
                       <ProjectRename
                         accountKey={bundle.account.key}
                         projectId={project.id}

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useId, useState } from "react";
 
 import { Icon } from "@/components/Icon";
@@ -40,13 +41,20 @@ export function OverviewSearch({ totalProjects }: { totalProjects: number }) {
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search all workspaces: project, domain, service…"
+          placeholder="Search all workspaces: project, domain, service, repo…"
           className="h-10 w-full rounded-lg border border-line bg-page pl-9 pr-3 text-sm placeholder:text-ink-2 focus:border-(--series-1)"
         />
       </div>
       <span id="overview-search-status" className="text-xs text-ink-2" role="status">
         {totalProjects} projects
       </span>
+      <Link
+        href={q ? `/search?q=${encodeURIComponent(query.trim())}` : "/search"}
+        className="link ml-auto text-xs"
+        title="Search READMEs and code across every project's repo"
+      >
+        {q ? `Search READMEs & code for “${query.trim()}” →` : "Advanced search: READMEs & code →"}
+      </Link>
     </div>
   );
 }

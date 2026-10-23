@@ -69,6 +69,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav aria-label="Main" className="order-last flex w-full min-w-0 items-center gap-1 overflow-x-auto pb-3 lg:order-none lg:ml-5 lg:w-auto lg:pb-0">
               <NavLink href="/">Overview</NavLink>
               <NavLink href="/services">Services</NavLink>
+              <NavLink href="/search">Search</NavLink>
               <NavLink href="/billing">Billing</NavLink>
               <NavLink href="/audit">
                 <span className="whitespace-nowrap">

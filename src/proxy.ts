@@ -8,8 +8,10 @@ import { isMockMode } from "@/lib/config";
  * 1. Host check (always on). Only requests addressed to this machine by a local
  *    name are served. This blocks DNS-rebinding attacks, where a web page you visit
  *    re-points its own domain at 127.0.0.1 to script this dashboard. Add other names
- *    with DASHBOARD_ALLOWED_HOSTS if you really need them. The public Vercel demo
- *    is allowed only while the app is in mock mode (no real Railway token).
+ *    with DASHBOARD_ALLOWED_HOSTS if you really need them. Full URLs are OK
+ *    (https:// is stripped). The public Vercel demo is allowed in mock mode.
+ *    A Vercel deploy with a real Railway token is allowed when DASHBOARD_PASSWORD
+ *    is set.
  * 2. Optional password (HTTP Basic auth, any username) when DASHBOARD_PASSWORD is set.
  */
 
@@ -31,23 +33,35 @@ function vercelHost(value: string | undefined): string | undefined {
   }
 }
 
-function hostAllowed(hostHeader: string | null): boolean {
-  if (!hostHeader) return false;
-  const name = hostName(hostHeader);
-  const extra = (process.env.DASHBOARD_ALLOWED_HOSTS ?? "")
+function listedHosts(): string[] {
+  return (process.env.DASHBOARD_ALLOWED_HOSTS ?? "")
     .split(",")
-    .map((h) => h.trim().toLowerCase())
-    .filter(Boolean);
-  if ([...LOCAL_HOSTS, ...extra].includes(name)) return true;
+    .map((h) => vercelHost(h))
+    .filter((h): h is string => !!h);
+}
 
-  if (!isMockMode()) return false;
-  if (name === "vercel.app" || name.endsWith(".vercel.app")) return true;
-  const vercelNames = [
+function vercelPlatformHosts(): string[] {
+  return [
     vercelHost(process.env.VERCEL_URL),
     vercelHost(process.env.VERCEL_PROJECT_PRODUCTION_URL),
     vercelHost(process.env.VERCEL_BRANCH_URL),
   ].filter((h): h is string => !!h);
-  return vercelNames.includes(name);
+}
+
+function isVercelHost(name: string): boolean {
+  return name === "vercel.app" || name.endsWith(".vercel.app") || vercelPlatformHosts().includes(name);
+}
+
+function hostAllowed(hostHeader: string | null): boolean {
+  if (!hostHeader) return false;
+  const name = hostName(hostHeader);
+  if ([...LOCAL_HOSTS, ...listedHosts()].includes(name)) return true;
+
+  // Demo deploys (no token) may use any *.vercel.app host.
+  // A real-token Vercel deploy is allowed only when DASHBOARD_PASSWORD is set.
+  if (!isVercelHost(name)) return false;
+  if (isMockMode()) return true;
+  return process.env.VERCEL === "1" && !!process.env.DASHBOARD_PASSWORD?.trim();
 }
 
 function constantTimeEqual(a: string, b: string): boolean {

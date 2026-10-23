@@ -154,6 +154,9 @@ query WorkspaceProjects($workspaceId: String!, $after: String) {
                     serviceId
                     serviceName
                     environmentId
+                    source {
+                      repo
+                    }
                     latestDeployment {
                       id
                       status

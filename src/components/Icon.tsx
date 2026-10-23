@@ -21,11 +21,13 @@ export type IconName =
   | "search"
   | "wallet"
   | "pencil"
+  | "code"
   | "railway";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></>,
   check: <polyline points="20 6 9 17 4 12" />,
+  code: <><polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /></>,
   x: (
     <>
       <line x1="18" y1="6" x2="6" y2="18" />

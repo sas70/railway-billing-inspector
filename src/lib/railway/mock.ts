@@ -807,6 +807,7 @@ function projectNode(project: MProject): T.ProjectNode {
               serviceId: i.serviceId,
               serviceName: serviceName(project, i.serviceId),
               environmentId: i.environmentId,
+              source: { repo: i.source.repo },
               latestDeployment: latest ? { id: latest.id, status: latest.status, createdAt: latest.createdAt } : null,
               activeDeployments: i.deployments
                 .filter((d) => i.activeIds.includes(d.id))

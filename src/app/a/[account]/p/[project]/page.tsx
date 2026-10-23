@@ -7,6 +7,9 @@ import { ActionButton } from "@/components/ActionReview";
 import { ErrorState } from "@/components/ErrorState";
 import { Icon } from "@/components/Icon";
 import { RailwayLink } from "@/components/RailwayLink";
+import { repoInfos } from "@/lib/code";
+import { aiSummariesAvailable, summaryStatuses, type SummaryStatus } from "@/lib/code/ai-summary";
+import { repoKey } from "@/lib/code/sources";
 import { railwayProjectUrl } from "@/lib/railway-links";
 import {
   Badge,
@@ -93,6 +96,11 @@ export default async function ProjectPage({ params, searchParams }: Props) {
   const liveCount = envView?.instances.filter((i) => i.healthInfo.health === "live" || i.healthInfo.health === "sleeping").length ?? 0;
   const volumeUsed = envView?.volumes.reduce((sum, v) => sum + v.currentSizeMB, 0) ?? 0;
   const volumeSize = envView?.volumes.reduce((sum, v) => sum + v.sizeMB, 0) ?? 0;
+  const repos = [...new Set((envView?.instances ?? []).flatMap((i) => (i.source?.repo ? [i.source.repo] : [])))].sort();
+  const [readmes, aiStatuses] = await Promise.all([repoInfos(repos), aiSummariesAvailable() ? summaryStatuses(repos) : Promise.resolve(new Map<string, SummaryStatus>())]);
+  const about = [...readmes.values()]
+    .map((i) => ({ ...i, ai: aiStatuses.get(repoKey(i.repo))?.stored?.summary ?? null, stale: !!aiStatuses.get(repoKey(i.repo))?.stale }))
+    .filter((i) => i.ai || i.readme || i.description);
 
   return (
     <div className="space-y-6">
@@ -142,6 +150,44 @@ export default async function ProjectPage({ params, searchParams }: Props) {
           }
         />
       </div>
+
+      {about.length > 0 && (
+        <Card>
+          <CardHeader
+            title={<span className="flex items-center gap-2"><Icon name="code" size={14} /> About this app</span>}
+            subtitle="From the repo it deploys from: Claude's summary of the code when available, otherwise the README."
+            actions={<Link href={`/search?repo=${encodeURIComponent(repos[0] ?? "")}`} className="link text-xs">Search its code →</Link>}
+          />
+          <ul className="divide-y divide-line">
+            {about.map((info) => (
+              <li key={info.repo} className="px-5 py-3 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(info.ai?.name ?? info.readme?.title) && <span className="font-medium">{info.ai?.name ?? info.readme?.title}</span>}
+                  {info.ai && <Badge tone={info.stale ? "warning" : "info"}>AI{info.stale ? " · code changed" : ""}</Badge>}
+                  <a href={`https://github.com/${info.repo}`} target="_blank" rel="noreferrer" className="link inline-flex items-center gap-1 font-mono text-xs">
+                    {info.repo}
+                    <Icon name="external" size={10} />
+                  </a>
+                  {info.source.kind === "local" && <Badge title={info.source.dir}>local clone</Badge>}
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-ink-2">{info.ai?.summary || info.readme?.summary || info.description}</p>
+                {info.ai && info.ai.features.length > 0 && (
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-xs text-ink-2">
+                    {info.ai.features.map((f) => (
+                      <li key={f}>{f}</li>
+                    ))}
+                  </ul>
+                )}
+                {info.ai && (
+                  <p className="mt-1.5 text-[11px] text-ink-2">
+                    {[...info.ai.stack, ...info.ai.services.map((x) => `→ ${x}`), info.ai.entrypoint && `runs: ${info.ai.entrypoint}`].filter(Boolean).join(" · ")}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
