@@ -545,6 +545,7 @@ mutation ProjectUpdate($id: String!, $input: ProjectUpdateInput!) {
   projectUpdate(id: $id, input: $input) {
     id
     name
+    description
   }
 }`);
 

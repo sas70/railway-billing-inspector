@@ -6,15 +6,14 @@ import { ActionButton } from "@/components/ActionReview";
 import { buttonClass } from "@/components/button";
 import { Icon } from "@/components/Icon";
 import { Badge, Card, CardHeader, EmptyState, PageTitle } from "@/components/ui";
-import { auditFilePath, collapseAudit, pendingDeletions, readAudit } from "@/lib/audit";
+import { auditFilePath, collapseAudit, pendingDeletions, readAudit, type AuditKind } from "@/lib/audit";
 import { isMockMode } from "@/lib/config";
 import { isReadOnly } from "@/lib/write-mode";
 import { dateTime, relative } from "@/lib/format";
-import type { PlanKind } from "@/lib/plan-types";
 
 export const metadata: Metadata = { title: "Audit log" };
 
-const KIND_LABEL: Record<PlanKind, string> = {
+const KIND_LABEL: Record<AuditKind, string> = {
   "deployment.remove": "Remove deployment",
   "deployment.restart": "Restart deployment",
   "deployment.redeploy": "Redeploy",
@@ -23,6 +22,7 @@ const KIND_LABEL: Record<PlanKind, string> = {
   "service.delete": "Delete service",
   "environment.delete": "Delete environment",
   "project.rename": "Rename project",
+  "project.describe": "Set project description",
   "project.scheduleDelete": "Schedule project deletion",
   "project.cancelDelete": "Cancel project deletion",
 };

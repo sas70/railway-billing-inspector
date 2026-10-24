@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { BlurbCard } from "@/components/BlurbCard";
+import { HoverLink } from "@/components/HoverLink";
 import { Icon } from "@/components/Icon";
 import { OverviewSearch } from "@/components/OverviewSearch";
 import { ProjectLinks } from "@/components/ProjectLinks";
@@ -21,11 +23,14 @@ import {
   PlanBadge,
   StatTile,
 } from "@/components/ui";
+import { repoBlurbs } from "@/lib/code/blurbs";
+import { repoKey } from "@/lib/code/sources";
 import { isProtectedProject, unmatchedProtectedEntries } from "@/lib/config";
 import { isReadOnly } from "@/lib/write-mode";
 import { dateNoYear, money, plural, relative } from "@/lib/format";
 import { emptyHealthCounts, needsAttention } from "@/lib/health";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
+import { blurbText, type RepoBlurb } from "@/lib/repo-blurb";
 import { cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
 
 export const metadata: Metadata = { title: "Overview" };
@@ -41,6 +46,8 @@ export default async function OverviewPage() {
   );
   const allProjects = bundles.flatMap((b) => (b.projects.ok ? b.projects.value : []));
   const unmatchedProtected = bundles.every((b) => b.projects.ok) ? unmatchedProtectedEntries(allProjects) : [];
+  // Hover cards: saved summaries / local READMEs only, so this adds no Railway or GitHub calls.
+  const blurbs = await repoBlurbs(allProjects.flatMap((p) => p.repos));
 
   const totals = emptyHealthCounts();
   let projectCount = 0;
@@ -173,6 +180,7 @@ export default async function OverviewPage() {
           bundle={bundle}
           showAccount={accounts.length > 1}
           readOnly={readOnly}
+          blurbs={blurbs}
         />
       ))}
     </div>
@@ -183,10 +191,12 @@ function WorkspaceSection({
   bundle,
   showAccount,
   readOnly,
+  blurbs,
 }: {
   bundle: WorkspaceBundle;
   showAccount: boolean;
   readOnly: boolean;
+  blurbs: Map<string, RepoBlurb>;
 }) {
   const figures = workspaceFigures(bundle);
   const billing = bundle.billing.ok ? bundle.billing.value : null;
@@ -293,6 +303,8 @@ function WorkspaceSection({
                 ]
                   .join(" ")
                   .toLowerCase();
+                const projectBlurbs = project.repos.flatMap((r) => blurbs.get(repoKey(r)) ?? []);
+                const nameClass = "font-medium hover:underline underline-offset-2";
                 return (
                   <tr
                     key={project.id}
@@ -302,9 +314,20 @@ function WorkspaceSection({
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Link href={href} className="font-medium hover:underline underline-offset-2">
-                          {project.name}
-                        </Link>
+                        {projectBlurbs.length > 0 || project.description ? (
+                          <HoverLink
+                            href={href}
+                            className={nameClass}
+                            card={<BlurbCard blurbs={projectBlurbs} description={project.description} />}
+                            description={blurbText(projectBlurbs, project.description)}
+                          >
+                            {project.name}
+                          </HoverLink>
+                        ) : (
+                          <Link href={href} className={nameClass}>
+                            {project.name}
+                          </Link>
+                        )}
                         {isProtectedProject(project) && (
                           <Badge title="Listed in PROTECTED_PROJECTS">
                             <Icon name="lock" size={10} /> protected

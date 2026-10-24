@@ -114,6 +114,27 @@ export async function repoInfo(repo: string, fresh = false): Promise<RepoInfo> {
   return info;
 }
 
+/**
+ * README summary without any network call: from the demo data or a local clone only, so list
+ * pages stay fast and show the same thing every time. Repos that exist only on GitHub get null.
+ */
+export async function offlineRepoInfo(repo: string): Promise<Pick<RepoInfo, "description" | "readme"> | null> {
+  const key = repoKey(repo);
+  if (isMockMode()) {
+    const mock = MOCK_REPOS[key];
+    if (!mock) return null;
+    const text = mock.files["README.md"] ?? "";
+    return { description: mock.description, readme: { ...summarizeReadme(text), file: "README.md", text, url: null } };
+  }
+  const found = cloneFor(repo, await localClones());
+  if (!found) return null;
+  try {
+    return await localInfo(repo, found.clone.dir);
+  } catch {
+    return null;
+  }
+}
+
 export async function repoInfos(repos: string[], fresh = false): Promise<Map<string, RepoInfo>> {
   const unique = [...new Map(repos.map((r) => [repoKey(r), r])).values()];
   const infos = await mapLimit(unique, 8, (r) => repoInfo(r, fresh));

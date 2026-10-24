@@ -1,4 +1,4 @@
-# Railway Billing Inspector: (My private repo)
+# Railway Billing Inspector
 
 A local Next.js dashboard for your Railway account(s). See every project and its status across your Hobby and Pro workspaces, drill down to services and deployments, check usage and billing, and clean things up. Nothing changes until you have reviewed and approved it.
 
@@ -12,9 +12,9 @@ With it I took every project offline in one click, then turned back on only the 
 
 ![Services page after cleanup: 94 services, 1 online, 93 offline](docs/dashboard-after-cleanup.jpg)
 
-- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. Search covers every workspace and account (name, domain, service, project ID). Under each project name: the public `*.up.railway.app` (or custom) domain, then a red **Open in Railway** link to `https://railway.com/project/<id>` so you can jump straight into Railway's dashboard. **Rename** sits under that — two-word Railway slugs like `steadfast-fascination` are marked **generated name**. Enable Write mode, type a clearer name, then review and approve.
-- **Search.** Find a project by what it does, not the name Railway generated. **Search → Project catalog** lists every project with a one-line summary pulled from its repo's README. Type a query to search project details, READMEs and the code itself, with options for regex, match case, path filter, workspace and status. Code is read **read-only** from your local clones (`CODE_LOCAL_ROOTS`, matched by each clone's GitHub remote) or from GitHub (`GITHUB_TOKEN`, or your `gh` CLI login when running locally). Nothing is cloned, pulled or changed. Each project page also gets an **About this app** card. With `ANTHROPIC_API_KEY` set, **Summarize with Claude** reads each repo's code (file tree, README, manifests, entry points) and writes a short summary. Each summary is saved inside that clone at `.railway-inspector/summary.json`, git-ignored through `.git/info/exclude`; repos that exist only on GitHub are saved under `data/code-summaries/`. Every summary is stamped with its commit and is regenerated automatically only when the code changes.
-- **Services.** Every service across every workspace. Default sort is **newest deploy first**. Click a column (service, status, environment, latest deploy, this period, expected) to sort. Search and All / Online / Offline still apply. Each row has a red **Open in Railway** icon next to the service name that opens that service in Railway (`/project/…/service/…`).
+- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. Search covers every workspace and account (name, domain, service, project ID). Under each project name: the public `*.up.railway.app` (or custom) domain, then a red **Open in Railway** link to `https://railway.com/project/<id>` so you can jump straight into Railway's dashboard. **Rename** sits under that — two-word Railway slugs like `steadfast-fascination` are marked **generated name**. Enable Write mode, type a clearer name, then review and approve. **Hover over a project name** to see what its code does: the saved Claude summary when there is one, otherwise the README of your local clone. These cards read local files only, so a repo that is only on GitHub shows one once it has been summarized.
+- **Search.** Find a project by what it does, not the name Railway generated. **Search → Project catalog** lists every project with a one-line summary pulled from its repo's README. Type a query to search project details, READMEs and the code itself, with options for regex, match case, path filter, workspace and status. Code is read **read-only** from your local clones (`CODE_LOCAL_ROOTS`, matched by each clone's GitHub remote) or from GitHub (`GITHUB_TOKEN`, or your `gh` CLI login when running locally). Nothing is cloned, pulled or changed. Each project page also gets an **About this app** card. With `ANTHROPIC_API_KEY` set, **Summarize with Claude** reads each repo's code (file tree, README, manifests, entry points) and writes a short summary. Each summary is saved inside that clone at `.railway-inspector/summary.json`, git-ignored through `.git/info/exclude`; repos that exist only on GitHub are saved under `data/code-summaries/`. Every summary is stamped with its commit and is regenerated automatically only when the code changes. **Copy to Railway descriptions** then writes each summary into its project's Railway description, so it shows up in Railway's own dashboard and anywhere else the project is listed (see [below](#copy-summaries-into-railway-descriptions)).
+- **Services.** Every service across every workspace. Default sort is **newest deploy first**. Click a column (service, status, environment, latest deploy, this period, expected) to sort. Search and All / Online / Offline still apply. Each row has a red **Open in Railway** icon next to the service name that opens that service in Railway (`/project/…/service/…`). Hover over a service name to see what its repo does.
 - **Project.** Cost by service and by resource, a service table for each environment, volumes, a red **Open in Railway** link, and a danger zone.
 - **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, the deployment history with bulk actions and logs, and a red **Open in Railway** link for that service.
 - **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits, the next invoice, invoices with PDF links, and cost by project and resource. Also available for the previous period.
@@ -35,19 +35,19 @@ With it I took every project offline in one click, then turned back on only the 
 To try it without a token, run `npm run demo`. It uses built-in fake data, and nothing is sent to Railway.
 For everyday use you can run `npm run build` once, then `npm start`, which is faster than dev mode.
 
-### Publishing updates (maintainer)
+### Making changes
 
-Work in this local folder. If GitHub has new PRs, pull them in **before** you publish, or you will overwrite the contributor.
+Your tokens and data never leave your machine: `.env`, `.env.local` and `data/` are git-ignored, so you can test against your real account and push the code as is.
 
 ```bash
-npm run pull:public                  # bring merged PRs into this folder
-# edit and test at http://127.0.0.1:3100
+git switch -c my-change              # work on a branch
+npm run dev                          # test with your real data at http://127.0.0.1:3100
 git add -A && git commit -m "your message"
-git push origin main                 # private backup
-npm run publish:public               # public repo + Vercel demo
+git push -u origin my-change         # Vercel builds a preview (demo data)
+# open a pull request, check the preview, then merge into main
 ```
 
-Do not `git push` this repo's `main` to the public project. Older private commits still contain a Railway token. The publish script copies the current source only (never `.env`).
+Merging into `main` updates the repo and the public demo. Run `git status` before committing if you want to double-check that no `.env` or `data/` file is listed.
 
 ---
 
@@ -73,6 +73,16 @@ The "Worth a look" suggestions only link to the right page. Nothing in the app a
 
 On **Overview**, under the project name, click **Rename**. Railway-assigned names (`adjective-noun`) show a **generated name** badge. Type the name you want (1–64 characters), click **Review**, then confirm. That calls Railway `projectUpdate`. It does not change services, domains, or cost. Protected projects and read-only mode stay locked. You can rename again later.
 
+### Copy summaries into Railway descriptions
+
+Once **Summarize with Claude** has run, enable Write mode and click **Copy to Railway descriptions** in the Search page's project catalog (or **Copy to Railway description** in a project's **About this app** card). The review lists every project with its current and new description; nothing changes until you confirm.
+
+- The text comes from the saved summaries, built on the server: the summary itself for a project with one repo, or `Name: summary.` per repo for a project with several.
+- Projects without a saved summary, with the same description already, protected, or scheduled for deletion are skipped. Projects that don't deploy from a GitHub repo (databases, images) aren't listed.
+- Railway doesn't publish a length limit for descriptions, so anything over 500 characters is trimmed at a word. If Railway rejects one, that project shows as failed and the rest carry on.
+- Each project is re-read just before it's written. If its description changed after your review, it's skipped. The previous text is kept in the audit log.
+- Only the description changes. Your saved summary files stay where they are, so search, hover cards and change tracking work as before.
+
 ### What each action does
 
 | Action | Railway API | Effect on cost | Undo |
@@ -84,6 +94,7 @@ On **Overview**, under the project name, click **Rename**. Railway-assigned name
 | **Delete service** (from one environment) | `serviceDelete(id, environmentId)` | Stops its charges in that environment. Volume data should be treated as gone. | Not reversible |
 | **Delete environment** (not the primary one) | `environmentDelete` | Stops everything in it. Good for forgotten PR environments. | Not reversible |
 | **Rename project** (Overview) | `projectUpdate` | none | Rename it again |
+| **Copy summaries into descriptions** (Search, project page) | `projectUpdate` (description only) | none | Edit or clear it in Railway; the previous text is in the audit log |
 | **Delete project** | `projectScheduleDelete` | Railway deletes the project after a **48-hour grace period** | Cancel within 48 h (Audit log page or Railway), which calls `projectScheduleDeleteCancel` |
 
 > Railway keeps removed deployments in the history list. Removing a deployment that isn't running doesn't lower your bill: costs come from running services (CPU/RAM), volume storage and egress. To save money, take idle services offline, delete PR environments, or delete projects you no longer need.
@@ -140,13 +151,13 @@ These use a 30-day month (43,200 minutes). Other inputs:
 
 ## Keeping in sync with Railway's API
 
-Run `npm run test:cost-history` to check date windows, project and resource deltas, missing data, deleted projects, and zero baselines.
+Run `npm run test:cost-history` to check date windows, project and resource deltas, missing data, deleted projects, and zero baselines. Run `npm run test:descriptions` to check how summaries become Railway descriptions (joining, de-duplicating, trimming).
 
 ```bash
 npm run check:queries
 ```
 
-This validates every GraphQL operation the dashboard sends (25 of them) against Railway's **live** schema, using introspection, so no token is needed. It also warns about deprecated fields. Run it if something starts failing after a Railway update.
+This validates every GraphQL operation the dashboard sends (26 of them) against Railway's **live** schema, using introspection, so no token is needed. It also warns about deprecated fields. Run it if something starts failing after a Railway update.
 
 ---
 
@@ -164,6 +175,9 @@ src/
     actions.ts                       Server Actions: create plan → execute plan, logs, refresh
   lib/
     plans.ts                         Approval engine (review, gating, phrase, expiry, re-check, audit)
+    describe.ts                      Same review → approve → re-check → audit path for copying summaries into descriptions
+    project-description.ts           Builds and trims description text from saved summaries (tested by test:descriptions)
+    code/blurbs.ts                   Hover-card text per repo, from local files only (saved summary, else a local clone's README)
     project-name.ts                  Detects Railway-generated adjective-noun project names
     railway-links.ts                 railway.com project and service dashboard URLs
     railway/documents.ts             Every GraphQL query/mutation (validated by check:queries; includes projectUpdate)
@@ -172,7 +186,7 @@ src/
     railway/mock.ts                  Demo-mode fake Railway
     billing.ts                       Unit prices, cost math, plan terms, periods
     audit.ts, config.ts, health.ts, format.ts
-  components/                        UI (review dialog, ProjectRename, OverviewSearch, RailwayLink, ServicesTable, charts, …)
+  components/                        UI (review dialogs, ProjectRename, HoverLink, OverviewSearch, RailwayLink, ServicesTable, charts, …)
   proxy.ts                           Optional password gate
 scripts/check-queries.mjs            Live schema validation
 ```

@@ -9,6 +9,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { isMockMode } from "../config";
+import { MOCK_SUMMARIES } from "./mock-corpus";
 import { cloneFor, githubGet, githubToken, localClones, mapLimit, repoKey, run } from "./sources";
 
 /**
@@ -94,6 +95,44 @@ async function readStored(file: string): Promise<StoredSummary | null> {
   }
 }
 
+const DEMO_FINGERPRINT: Fingerprint = { commit: "demo", dirty: null };
+
+/** Demo mode: built-in stand-in summaries. No files and no Claude calls. */
+function mockStored(repo: string): StoredSummary | null {
+  const summary = MOCK_SUMMARIES[repoKey(repo)];
+  return summary
+    ? { version: 1, repo, fingerprint: DEMO_FINGERPRINT, generatedAt: "2026-01-01T00:00:00.000Z", model: SUMMARY_MODEL, summary }
+    : null;
+}
+
+/**
+ * The summary saved for a repo, read straight from disk: no git, GitHub or Claude calls, so
+ * list pages can show it cheaply. It isn't compared with the current code (Search does that).
+ */
+export async function savedSummary(repo: string): Promise<StoredSummary | null> {
+  if (isMockMode()) return mockStored(repo);
+  const found = cloneFor(repo, await localClones());
+  const files = [
+    ...(found ? [path.join(found.clone.dir, DIR_NAME, "summary.json")] : []),
+    path.join(DATA_DIR, `${repoKey(repo).replace("/", "__")}.json`),
+  ];
+  for (const file of files) {
+    const stored = await readStored(file);
+    if (stored) return stored;
+  }
+  return null;
+}
+
+export async function savedSummaries(repos: string[]): Promise<Map<string, StoredSummary>> {
+  const out = new Map<string, StoredSummary>();
+  const unique = [...new Map(repos.map((r) => [repoKey(r), r])).values()];
+  await mapLimit(unique, 8, async (r) => {
+    const stored = await savedSummary(r);
+    if (stored) out.set(repoKey(r), stored);
+  });
+  return out;
+}
+
 /** Keep the summary folder out of git without touching the repo's own .gitignore. */
 async function excludeFromGit(dir: string) {
   const { stdout } = await run("git", ["-C", dir, "rev-parse", "--git-path", "info/exclude"], { timeout: 10_000 });
@@ -113,6 +152,10 @@ const statusCache = new Map<string, { at: number; status: SummaryStatus | null }
 
 /** Stored summary + whether the code has changed since. Cached for a minute. */
 export async function summaryStatus(repo: string): Promise<SummaryStatus | null> {
+  if (isMockMode()) {
+    const stored = mockStored(repo);
+    return stored ? { stored, current: DEMO_FINGERPRINT, stale: false, location: "demo data" } : null;
+  }
   const key = repoKey(repo);
   const cached = statusCache.get(key);
   if (cached && Date.now() - cached.at < 60_000) return cached.status;

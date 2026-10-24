@@ -1,4 +1,5 @@
 import type { Health } from "./health";
+import type { RepoBlurb } from "./repo-blurb";
 
 /** One service instance in one environment — the unit of the Services dashboard. */
 export type ServiceCatalogRow = {
@@ -25,4 +26,8 @@ export type ServiceCatalogRow = {
   periodCost: number | null;
   expectedCost: number | null;
   costIsAllEnvs: boolean;
+  /** GitHub `owner/name` the service deploys from, if any. */
+  repo: string | null;
+  /** What that repo does, for the hover card (added by the Services page). */
+  blurb?: RepoBlurb | null;
 };

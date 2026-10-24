@@ -1191,11 +1191,18 @@ const HANDLERS: Record<string, Handler> = {
 
   ProjectUpdate: (w, v, op) => {
     const project = findProject(w, v.id, op);
-    const input = v.input as { name?: unknown } | undefined;
-    const name = typeof input?.name === "string" ? input.name.trim() : "";
-    if (!name) throw refuse("Project name is required", op);
-    project.name = name;
-    return { projectUpdate: { id: project.id, name: project.name } };
+    const input = (v.input ?? {}) as { name?: unknown; description?: unknown };
+    if (input.name === undefined && input.description === undefined) throw refuse("Nothing to update", op);
+    if (input.name !== undefined) {
+      const name = typeof input.name === "string" ? input.name.trim() : "";
+      if (!name) throw refuse("Project name is required", op);
+      project.name = name;
+    }
+    if (input.description !== undefined) {
+      if (typeof input.description !== "string") throw refuse("Description must be a string", op);
+      project.description = input.description.trim() || null;
+    }
+    return { projectUpdate: { id: project.id, name: project.name, description: project.description } };
   },
 
   ProjectScheduleDelete: (w, v, op) => {

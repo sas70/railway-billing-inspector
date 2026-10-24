@@ -228,11 +228,11 @@ export function sortEnvironments<E extends { id: string; name: string; isEphemer
   });
 }
 
-export async function loadWorkspaceProjects(account: AccountConfig, workspaceId: string): Promise<ProjectSummary[]> {
+export async function loadWorkspaceProjects(account: AccountConfig, workspaceId: string, opts: { fresh?: boolean } = {}): Promise<ProjectSummary[]> {
   const out: ProjectSummary[] = [];
   let after: string | undefined;
   for (let page = 0; page < 20; page++) {
-    const { projects } = await railwayRequest<T.WorkspaceProjectsResult>(account, D.WorkspaceProjects, { workspaceId, after });
+    const { projects } = await railwayRequest<T.WorkspaceProjectsResult>(account, D.WorkspaceProjects, { workspaceId, after }, opts);
     out.push(...nodes(projects).map(summarizeProject));
     if (!projects.pageInfo.hasNextPage || !projects.pageInfo.endCursor) break;
     after = projects.pageInfo.endCursor;
