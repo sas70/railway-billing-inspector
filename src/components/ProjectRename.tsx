@@ -6,25 +6,26 @@ import { ReviewDialog } from "@/components/ActionReview";
 import { buttonClass } from "@/components/button";
 import { Icon } from "@/components/Icon";
 import { Badge } from "@/components/ui";
-import { isGeneratedRailwayName } from "@/lib/project-name";
 
 export function ProjectRename({
   accountKey,
   projectId,
   currentName,
+  generated,
   readOnly,
   lockedReason,
 }: {
   accountKey: string;
   projectId: string;
   currentName: string;
+  /** The name looks like one Railway picked at random (isGeneratedRailwayName, decided on the server). */
+  generated: boolean;
   readOnly: boolean;
   lockedReason?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [review, setReview] = useState(false);
-  const generated = isGeneratedRailwayName(currentName);
   const next = draft.trim().replace(/\s+/g, " ");
   const ready = next.length >= 1 && next.length <= 64 && next !== currentName;
   const disabled = readOnly || !!lockedReason;
@@ -40,7 +41,7 @@ export function ProjectRename({
       {!open ? (
         <div className="flex flex-wrap items-center gap-1.5">
           {generated && (
-            <Badge title="Railway assigned this two-word name">generated name</Badge>
+            <Badge title="Looks like the random two-word name Railway gives new projects">generated name</Badge>
           )}
           <button
             type="button"

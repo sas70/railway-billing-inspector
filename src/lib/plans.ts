@@ -24,13 +24,14 @@ import {
   loadEnvironment,
   loadProject,
   loadServiceInstance,
+  loadWorkspaceProjects,
   type ProjectDetail,
 } from "./railway/api";
 import { clearCache, railwayRequest } from "./railway/client";
 import * as D from "./railway/documents";
 import { RailwayApiError } from "./railway/errors";
 import type { DeploymentReviewNode } from "./railway/types";
-import { isGeneratedRailwayName } from "./project-name";
+import { isGeneratedRailwayName, projectNameHints } from "./project-name";
 
 /**
  * The approval engine.
@@ -412,9 +413,25 @@ function draftCancelDelete(projectId: string, projectName: string): Draft {
   };
 }
 
-function draftProjectRename(project: ProjectDetail, newName: string): Draft {
+/**
+ * The hints isGeneratedRailwayName needs (repo and service names), built the same way as on the
+ * Overview: from the workspace's project list, a cached read the Overview has usually just made.
+ * Falls back to the service names alone.
+ */
+async function renameHints(account: AccountConfig, project: ProjectDetail): Promise<string[]> {
+  const services = project.services.map((s) => s.name);
+  if (!project.workspace) return services;
+  try {
+    const summary = (await loadWorkspaceProjects(account, project.workspace.id)).find((p) => p.id === project.id);
+    return summary ? projectNameHints(summary) : services;
+  } catch {
+    return services;
+  }
+}
+
+function draftProjectRename(project: ProjectDetail, newName: string, hints: string[]): Draft {
   const same = project.name === newName;
-  const generated = isGeneratedRailwayName(project.name);
+  const generated = isGeneratedRailwayName(project.name, hints);
   return {
     title: `Rename ${project.name} → ${newName}`,
     verb: "Rename",
@@ -434,9 +451,9 @@ function draftProjectRename(project: ProjectDetail, newName: string): Draft {
     ],
     impact: [
       `Changes the Railway project name from “${project.name}” to “${newName}”.`,
-      "Services, domains, deployments and billing stay the same. Only the display name changes.",
+      "Services, domains, deployments, your variables and billing stay the same. Railway's own RAILWAY_PROJECT_NAME variable takes the new name at each service's next deploy.",
     ],
-    recovery: "Rename it again from Overview if you want a different name.",
+    recovery: "Rename it again from Overview, or on the Rename projects page, if you want a different name.",
     blockedReason: project.deletedAt ? "This project is scheduled for deletion." : undefined,
   };
 }
@@ -488,7 +505,7 @@ export async function createPlan(input: unknown): Promise<PlanView> {
   if (req.kind.startsWith("deployment.")) draft = await draftDeploymentPlan(account, req, project!);
   else if (req.kind === "service.delete") draft = await draftServiceDelete(account, req, project!);
   else if (req.kind === "environment.delete") draft = await draftEnvironmentDelete(account, req, project!);
-  else if (req.kind === "project.rename") draft = draftProjectRename(project!, req.newName!);
+  else if (req.kind === "project.rename") draft = draftProjectRename(project!, req.newName!, await renameHints(account, project!));
   else if (req.kind === "project.scheduleDelete") draft = draftProjectDelete(project!);
   else draft = draftCancelDelete(req.projectId, projectName);
 

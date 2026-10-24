@@ -77,6 +77,22 @@ http.createServer((req, res) => { /* verify signature, forward */ res.end("ok");
 `,
     },
   },
+  "acme/status": {
+    description: "Status page for acme.dev",
+    files: {
+      "README.md": `# status
+
+Public status page for acme.dev. Checks the API and the storefront every minute and shows the
+last 90 days of uptime.
+`,
+      "src/check.ts": `export async function check(url: string) {
+  const started = Date.now();
+  const res = await fetch(url, { method: "HEAD" });
+  return { ok: res.ok, ms: Date.now() - started };
+}
+`,
+    },
+  },
   "studio/portal-web": {
     description: "Client portal front end",
     files: {
@@ -128,6 +144,20 @@ def build_report(client):
 `,
     },
   },
+  "studio/invoice-mailer": {
+    description: "Monthly invoice emails",
+    files: {
+      "README.md": `# invoice-mailer
+
+Emails every studio client their monthly invoice as a PDF on the 1st, using Postmark templates.
+`,
+      "send.py": `import os
+from postmarker.core import PostmarkClient
+
+postmark = PostmarkClient(server_token=os.environ["POSTMARK_TOKEN"])
+`,
+    },
+  },
   "studio/legacy-dash": {
     description: "Old analytics dashboard",
     files: {
@@ -157,10 +187,20 @@ export type MockSummary = {
 };
 
 /**
- * Demo stand-ins for "Summarize with Claude" results. acme/relay and studio/legacy-dash are
- * left out on purpose, so the demo also shows the README fallback and "no summary yet".
+ * Demo stand-ins for "Summarize with Claude" results. acme/relay, studio/invoice-mailer and
+ * studio/legacy-dash are left out on purpose, so the demo also shows the README fallback,
+ * "no summary yet" and a rename suggestion taken from a repo name.
  */
 export const MOCK_SUMMARIES: Record<string, MockSummary> = {
+  "acme/status": {
+    name: "Acme status page",
+    summary: "Uptime checker and public status page for acme.dev: pings the API and storefront every minute and shows 90 days of history.",
+    stack: ["TypeScript", "Node.js"],
+    features: ["Checks every minute", "90-day uptime history"],
+    services: ["Acme API"],
+    entrypoint: "node dist/index.js",
+    keywords: ["status", "uptime", "monitoring"],
+  },
   "acme/api": {
     name: "Acme storefront API",
     summary: "Express API that serves the Acme product catalog, carts and Stripe checkout, with a worker that emails order confirmations through Postmark.",

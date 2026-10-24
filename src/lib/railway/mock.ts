@@ -221,6 +221,13 @@ const SPEC: ProjSpec[] = [
     envs: [{ name: "production", services: [{ name: "scraper", image: "python:3.12-slim", history: ["REMOVED", "REMOVED"], ranFraction: 0.4, rates: { cpu: 0.01, mem: 0.1, egressPerDay: 0.02 } }] }],
   },
   {
+    // Still has the random name Railway gave it (the rename table suggests one from its AI summary).
+    ws: "personal",
+    name: "steadfast-fascination",
+    ageDays: 45,
+    envs: [{ name: "production", services: [{ name: "status", repo: "acme/status", history: ["SUCCESS", "REMOVED"], rates: { cpu: 0.0008, mem: 0.02, egressPerDay: 0.01 }, domain: "status.acme.dev" }] }],
+  },
+  {
     ws: "personal",
     name: "old-experiments",
     description: "Notebook sandbox",
@@ -262,6 +269,18 @@ const SPEC: ProjSpec[] = [
           { name: "ingest-worker", repo: "studio/pipeline", history: ["BUILDING", "SUCCESS", "REMOVED", "REMOVED"], rates: { cpu: 0.6, mem: 1.8, egressPerDay: 0.3 } },
           { name: "nightly-report", repo: "studio/pipeline", cron: "0 3 * * *", history: ["SUCCESS", "REMOVED", "REMOVED"], rates: { cpu: 0.002, mem: 0.05 } },
         ],
+      },
+    ],
+  },
+  {
+    // Random Railway name, and no saved summary for its repo: the suggestion comes from the repo name.
+    ws: "studio",
+    name: "lively-vision",
+    ageDays: 30,
+    envs: [
+      {
+        name: "production",
+        services: [{ name: "invoice-mailer", repo: "studio/invoice-mailer", cron: "0 6 1 * *", history: ["SUCCESS", "REMOVED"], rates: { cpu: 0.0005, mem: 0.01 } }],
       },
     ],
   },

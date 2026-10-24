@@ -16,24 +16,14 @@ Votes and comments live on GitHub issues, so everyone sees the same counts. You 
 
 ## Now: being built
 
-### Bulk rename table
-
-Railway gives new projects two-word names like `steadfast-fascination`. This table replaces them with names that say what each app does.
-
-- One row per project: current name, suggested name, and a checkbox.
-- Suggestions come from each app's saved AI summary, written as slugs like `room-shell-matcher`. Every suggestion can be edited.
-- Railway's generated names are ticked for you.
-- **Rename selected** shows one review of every old → new name, then runs after one confirm.
-- Each rename is recorded in the audit log. Only the display name changes: domains, services and billing stay the same.
-
-## Next: planned
-
 ### AI assistant, step 1: guide
 
 Ask in plain words, like "which apps cost the most?" or "I want to summarize my apps", and get an answer or a link to the page that does it.
 
 - Answers from your dashboard's data: projects, costs, status and saved summaries.
 - Read-only: it can't change anything.
+
+## Next: planned
 
 ### AI assistant, step 2: propose and confirm
 
@@ -57,6 +47,7 @@ One request runs a whole chore, such as "summarize my new apps, copy the descrip
 
 **New in this release**
 
+- **Rename projects.** Swap Railway's random names like `steadfast-fascination` for names that say what each app does, several at once. Names are suggested from each app's saved summary (or its repo name), the random ones are ticked for you, and one review covers every old → new name.
 - **Hover summaries.** Hover a project or service name to see what its code does.
 - **Railway descriptions.** Copy each app's saved summary into its Railway project description, after one review.
 - **"Worth a look" time filter.** Show only what happened today, this week (the default), this month, this year, or everything. Charges get their own "Still on this period's bill" list, which says whether each one is still charging or stopped earlier.

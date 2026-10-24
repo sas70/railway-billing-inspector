@@ -10,6 +10,8 @@ import { createDescribePlan, executeDescribePlan } from "@/lib/describe";
 import type { DescribeExecutionView, DescribePlanView } from "@/lib/describe-types";
 import type { ActionResult, ExecutionView, PlanView } from "@/lib/plan-types";
 import { createPlan, executePlan, UserFacingError } from "@/lib/plans";
+import { createRenamePlan, executeRenamePlan } from "@/lib/rename";
+import type { RenameExecutionView, RenamePlanView } from "@/lib/rename-types";
 import { friendlyError, loadDeployment, loadLogs, loadProject } from "@/lib/railway/api";
 import { clearCache } from "@/lib/railway/client";
 import type { LogLine } from "@/lib/railway/types";
@@ -62,6 +64,23 @@ export async function createDescribePlanAction(scope: unknown): Promise<ActionRe
 export async function executeDescribePlanAction(planId: unknown): Promise<ActionResult<DescribeExecutionView>> {
   try {
     return { ok: true, data: await executeDescribePlan(planId) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** Review renaming several projects at once ({ items: [{ projectId, newName }] }). Changes nothing. */
+export async function createRenamePlanAction(request: unknown): Promise<ActionResult<RenamePlanView>> {
+  try {
+    return { ok: true, data: await createRenamePlan(request) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+export async function executeRenamePlanAction(planId: unknown): Promise<ActionResult<RenameExecutionView>> {
+  try {
+    return { ok: true, data: await executeRenamePlan(planId) };
   } catch (error) {
     return { ok: false, error: toMessage(error) };
   }
