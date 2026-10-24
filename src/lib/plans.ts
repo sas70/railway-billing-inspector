@@ -686,6 +686,11 @@ export async function executePlan(planId: unknown, typedPhrase: unknown): Promis
   const account = getAccount(plan.accountKey);
   if (!account) throw new UserFacingError("Unknown account. Check your .env.local tokens.");
 
+  // Single use: claim the plan before the first await, so two requests that arrive together
+  // (a retried connection, a scripted POST) can't both run it. Anything that fails from here
+  // on needs a fresh review.
+  plans.delete(planId);
+
   // Re-read the project and re-apply policy before touching anything.
   let freshProject: ProjectDetail | null = null;
   if (plan.view.kind !== "project.cancelDelete") {
@@ -711,9 +716,6 @@ export async function executePlan(planId: unknown, typedPhrase: unknown): Promis
       throw new UserFacingError(`Couldn't re-read the service from Railway, so nothing was changed: ${friendlyError(error)}`);
     }
   }
-
-  // Single use: remove before running so a double-click can't execute it twice.
-  plans.delete(planId);
 
   const results: ExecutionItemResult[] = [];
   let auditError: string | undefined;

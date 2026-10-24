@@ -262,14 +262,16 @@ export async function executeBulkPlan(planId: unknown, typedPhrase: unknown): Pr
     plans.delete(planId);
     throw new UserFacingError("This review expired (10 minutes). Start again so the current state is re-checked.");
   }
-  if (await isReadOnly()) throw new UserFacingError("Read-only mode is on. Enable Write mode in the header to make changes.");
   if (stored.view.blockedReason) throw new UserFacingError(stored.view.blockedReason);
   const typed = typeof typedPhrase === "string" ? normalizePhrase(typedPhrase) : "";
   if (!stored.view.phrase || typed !== stored.view.phrase) {
     throw new UserFacingError(`To approve, type ${stored.view.phrase} exactly.`);
   }
 
+  // Single use: claim the plan before the first await, so two requests that arrive together
+  // can't both run it.
   plans.delete(planId);
+  if (await isReadOnly()) throw new UserFacingError("Read-only mode is on. Enable Write mode in the header to make changes.");
 
   const results: ExecutionItemResult[] = [];
   let auditError: string | undefined;
