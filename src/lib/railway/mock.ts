@@ -212,6 +212,13 @@ const SPEC: ProjSpec[] = [
     envs: [{ name: "production", services: [{ name: "relay", repo: "acme/relay", history: ["SLEEPING", "REMOVED"], sleep: true, rates: { cpu: 0.0003, mem: 0.004 } }] }],
   },
   {
+    // Ran for part of this period, then taken offline: charged earlier, nothing new since.
+    ws: "personal",
+    name: "demo-scraper",
+    ageDays: 60,
+    envs: [{ name: "production", services: [{ name: "scraper", image: "python:3.12-slim", history: ["REMOVED", "REMOVED"], ranFraction: 0.4, rates: { cpu: 0.01, mem: 0.1, egressPerDay: 0.02 } }] }],
+  },
+  {
     ws: "personal",
     name: "old-experiments",
     description: "Notebook sandbox",

@@ -1,10 +1,11 @@
 import { periodProgress, projectPeriod, type CostBreakdown, type PeriodProjection } from "./billing";
 import { isProtectedProject } from "./config";
-import { money, plural, relative } from "./format";
+import { dateNoYear, money, plural, relative } from "./format";
 import { isOnlineHealth } from "./health";
 import type { ProjectSummary, ProjectUsage, WorkspaceBundle } from "./railway/api";
 import type { ServiceCatalogRow } from "./service-row";
 import { DEFAULT_SERVICE_SORT, sortServiceRows } from "./service-stats";
+import { billState } from "./worth-a-look";
 
 export type { ServiceCatalogRow };
 
@@ -50,8 +51,12 @@ export type Candidate = {
   href: string;
   /** When it happened: the latest deploy behind it (ISO), if known. Used by the time filter. */
   at: string | null;
-  /** Still costing money this period (running PR environment, idle project with charges): shown whatever the time filter. */
+  /** On this period's bill (running PR environment, project with nothing running but charges): listed apart, whatever the time filter. */
   ongoing: boolean;
+  /** Bill items: still adding to the bill now, as opposed to charges from earlier in the period. */
+  charging?: boolean;
+  /** Bill items: what it has cost so far this period. */
+  periodCost?: number;
 };
 
 function latestDeploy(instances: { latest: { createdAt: string } | null }[]): string | null {
@@ -95,19 +100,45 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
             href: `${base}?env=${env.id}`,
             at: latestDeploy(env.instances),
             ongoing: true,
+            charging: true,
+            periodCost: cost ?? 0,
           });
         }
       }
       if (project.health.live + project.health.sleeping === 0 && usage && usage.cost.total >= 0.01) {
+        const soFar = usage.cost.total;
+        const periodEnd = bundle.billing.ok ? bundle.billing.value.period.end : null;
+        const state = billState({
+          soFar,
+          projected: figures.estimateByProject[project.id]?.total ?? (bundle.estimates?.ok ? 0 : null),
+          remainingDays: figures.progress?.remainingDays ?? null,
+          volumeSoFar: usage.cost.volume,
+        });
+        const volumeShare = usage.cost.volume / soFar;
+        const ends = periodEnd ? ` when the billing period ends ${dateNoYear(periodEnd)}` : " when the billing period ends";
         out.push({
           key: `${project.id}-idle`,
-          severity: 2,
+          severity: state.charging ? 1 : 2,
           icon: "database",
-          title: `${project.name}: nothing live, but ${money(usage.cost.total)} used this period`,
-          detail: usage.cost.volume > 0 ? "Mostly volume storage — volumes bill until deleted" : "Usage from earlier in the period",
+          title: state.charging
+            ? `${project.name}: nothing running, but still charging`
+            : `${project.name}: ${money(soFar)} from earlier this period`,
+          detail: state.charging
+            ? [
+                `${money(soFar)} so far this period`,
+                state.perDay != null ? `about ${money(state.perDay)} a day more` : null,
+                usage.cost.volume > 0 ? "volume storage bills every day until the volume is deleted" : "Railway expects more usage before the period ends",
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : state.known
+              ? `Nothing running and no new charges. It was billed while it ran earlier in the period${volumeShare > 0.5 ? " (mostly volume storage, since deleted)" : ""}, and leaves this list${ends}.`
+              : `Nothing running. Railway didn't return a projection, so it isn't clear whether charges stopped; check Billing → Cost history.`,
           href: base,
           at: project.lastDeployAt,
           ongoing: true,
+          charging: state.charging,
+          periodCost: soFar,
         });
       }
     }

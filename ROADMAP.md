@@ -59,7 +59,7 @@ One request runs a whole chore, such as "summarize my new apps, copy the descrip
 
 - **Hover summaries.** Hover a project or service name to see what its code does.
 - **Railway descriptions.** Copy each app's saved summary into its Railway project description, after one review.
-- **"Worth a look" time filter.** Show only what happened today, this week (the default), this month, this year, or everything. Anything still costing money always shows.
+- **"Worth a look" time filter.** Show only what happened today, this week (the default), this month, this year, or everything. Charges get their own "Still on this period's bill" list, which says whether each one is still charging or stopped earlier.
 
 **Already in the app**
 
