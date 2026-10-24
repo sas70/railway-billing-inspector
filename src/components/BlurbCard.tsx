@@ -8,7 +8,7 @@ export function BlurbCard({ blurbs, description }: { blurbs: RepoBlurb[]; descri
     if (!description) return null;
     return (
       <div className="space-y-0.5">
-        <div className="text-[11px] text-ink-2">Railway description</div>
+        <div className="text-[11px] text-ink-2">Project description on Railway</div>
         <p className="leading-relaxed">{description}</p>
       </div>
     );

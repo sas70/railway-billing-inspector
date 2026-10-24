@@ -177,6 +177,7 @@ export function serviceCatalog(bundles: WorkspaceBundle[]): ServiceCatalogRow[] 
             expectedCost,
             costIsAllEnvs: usageReady && !hasEnv,
             repo: inst.repo,
+            projectDescription: project.description,
           });
         }
       }

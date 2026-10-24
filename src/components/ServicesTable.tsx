@@ -105,6 +105,10 @@ export function ServicesTable({ rows, readOnly }: { rows: ServiceCatalogRow[]; r
                 const canOn = !row.online;
                 const onReason = lock;
                 const search = `${row.serviceName} ${row.projectName} ${row.workspaceName} ${row.environmentName}`.toLowerCase();
+                // Hover card: the repo's saved summary, else (for services built from a repo) the project's Railway
+                // description, which is all a deployed copy such as Vercel can read. Databases and images get none.
+                const hoverBlurbs = row.blurb ? [row.blurb] : [];
+                const hoverDescription = row.repo ? row.projectDescription : null;
 
                 return (
                   <tr
@@ -116,12 +120,12 @@ export function ServicesTable({ rows, readOnly }: { rows: ServiceCatalogRow[]; r
                   >
                     <td className="px-4 py-2.5 align-top">
                       <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        {row.blurb ? (
+                        {hoverBlurbs.length > 0 || hoverDescription ? (
                           <HoverLink
                             href={row.href}
                             className="font-medium hover:underline underline-offset-2"
-                            card={<BlurbCard blurbs={[row.blurb]} />}
-                            description={blurbText([row.blurb])}
+                            card={<BlurbCard blurbs={hoverBlurbs} description={hoverDescription} />}
+                            description={blurbText(hoverBlurbs, hoverDescription)}
                           >
                             {row.serviceName}
                           </HoverLink>
