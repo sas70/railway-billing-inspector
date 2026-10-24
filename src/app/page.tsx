@@ -10,6 +10,7 @@ import { ProjectLinks } from "@/components/ProjectLinks";
 import { ProjectRename } from "@/components/ProjectRename";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
+import { WorthALook } from "@/components/WorthALook";
 import {
   Badge,
   Card,
@@ -144,35 +145,7 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      {candidates.length > 0 && (
-        <Card className="overflow-hidden">
-          <CardHeader
-            title={<span className="flex items-center gap-2">Worth a look <Badge>{candidates.length}</Badge></span>}
-            subtitle="A few things to review. Every change still needs your approval."
-          />
-          <ul className="recommendations grid md:grid-cols-2">
-            {candidates.slice(0, 10).map((c) => (
-              <li key={c.key}>
-                <Link href={c.href} className="flex h-full items-start gap-3 px-5 py-4 transition-colors hover:bg-surface-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: c.severity === 0 ? "var(--danger-wash)" : c.severity === 1 ? "var(--warning-wash)" : "var(--info-wash)" }}>
-                    <Icon
-                      name={c.icon}
-                      size={15}
-                      color={c.severity === 0 ? "var(--status-critical)" : c.severity === 1 ? "var(--status-warning)" : "var(--series-1)"}
-                    />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">{c.title}</span>
-                    <span className="mt-1 block text-xs leading-relaxed text-ink-2">{c.detail}</span>
-                  </span>
-                  <Icon name="chevron" size={14} className="mt-1 shrink-0 text-ink-2" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {candidates.length > 10 && <p className="border-t border-line px-4 py-2 text-xs text-ink-2">…and {candidates.length - 10} more.</p>}
-        </Card>
-      )}
+      {candidates.length > 0 && <WorthALook candidates={candidates} renderedAt={Date.now()} />}
 
       {bundles.map((bundle) => (
         <WorkspaceSection

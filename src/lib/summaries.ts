@@ -48,7 +48,17 @@ export type Candidate = {
   title: string;
   detail: string;
   href: string;
+  /** When it happened: the latest deploy behind it (ISO), if known. Used by the time filter. */
+  at: string | null;
+  /** Still costing money this period (running PR environment, idle project with charges): shown whatever the time filter. */
+  ongoing: boolean;
 };
+
+function latestDeploy(instances: { latest: { createdAt: string } | null }[]): string | null {
+  let latest: string | null = null;
+  for (const i of instances) if (i.latest && (!latest || i.latest.createdAt > latest)) latest = i.latest.createdAt;
+  return latest;
+}
 
 /** Things worth a look. Suggestions only — nothing here acts on its own. */
 export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
@@ -64,12 +74,13 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
           const href = `${base}/s/${inst.serviceId}?env=${env.id}`;
           const where = `${project.name} › ${inst.serviceName}`;
           const when = inst.latest ? `last deploy ${relative(inst.latest.createdAt)}` : "no deployments";
+          const at = inst.latest?.createdAt ?? null;
           if (inst.health === "crashed") {
-            out.push({ key: `${inst.id}-crashed`, severity: 0, icon: "alert", title: `${where} has crashed`, detail: `${env.name} · ${when} · restart it or remove it`, href });
+            out.push({ key: `${inst.id}-crashed`, severity: 0, icon: "alert", title: `${where} has crashed`, detail: `${env.name} · ${when} · restart it or remove it`, href, at, ongoing: false });
           } else if (inst.health === "failed") {
-            out.push({ key: `${inst.id}-failed`, severity: 1, icon: "x", title: `${where}: latest deploy failed, nothing live`, detail: `${env.name} · ${when}`, href });
+            out.push({ key: `${inst.id}-failed`, severity: 1, icon: "x", title: `${where}: latest deploy failed, nothing live`, detail: `${env.name} · ${when}`, href, at, ongoing: false });
           } else if (inst.degraded) {
-            out.push({ key: `${inst.id}-degraded`, severity: 1, icon: "alert", title: `${where}: newest deploy failed`, detail: `${env.name} · an older deployment is still serving`, href });
+            out.push({ key: `${inst.id}-degraded`, severity: 1, icon: "alert", title: `${where}: newest deploy failed`, detail: `${env.name} · an older deployment is still serving`, href, at, ongoing: false });
           }
         }
         const running = env.health.live + env.health.sleeping;
@@ -82,6 +93,8 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
             title: `${project.name}: PR environment ${env.name} is still running`,
             detail: `${plural(running, "service")}${cost ? ` · ${money(cost)} this period` : ""} · delete it once the PR is merged`,
             href: `${base}?env=${env.id}`,
+            at: latestDeploy(env.instances),
+            ongoing: true,
           });
         }
       }
@@ -93,6 +106,8 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
           title: `${project.name}: nothing live, but ${money(usage.cost.total)} used this period`,
           detail: usage.cost.volume > 0 ? "Mostly volume storage — volumes bill until deleted" : "Usage from earlier in the period",
           href: base,
+          at: project.lastDeployAt,
+          ongoing: true,
         });
       }
     }

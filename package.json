@@ -9,8 +9,10 @@
     "build": "next build",
     "start": "next start -H 127.0.0.1 -p 3100",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "node --test scripts/test-cost-history.mjs scripts/test-project-description.mjs scripts/test-worth-a-look.mjs",
     "test:cost-history": "node --test scripts/test-cost-history.mjs",
     "test:descriptions": "node --test scripts/test-project-description.mjs",
+    "test:worth-a-look": "node --test scripts/test-worth-a-look.mjs",
     "check:queries": "node scripts/check-queries.mjs"
   },
   "dependencies": {
