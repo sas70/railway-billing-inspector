@@ -5,7 +5,7 @@ import { isOnlineHealth } from "./health";
 import type { ProjectSummary, ProjectUsage, WorkspaceBundle } from "./railway/api";
 import type { ServiceCatalogRow } from "./service-row";
 import { DEFAULT_SERVICE_SORT, sortServiceRows } from "./service-stats";
-import { billState } from "./worth-a-look";
+import { billState, RECENT_DAYS } from "./worth-a-look";
 
 export type { ServiceCatalogRow };
 
@@ -108,12 +108,7 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
       if (project.health.live + project.health.sleeping === 0 && usage && usage.cost.total >= 0.01) {
         const soFar = usage.cost.total;
         const periodEnd = bundle.billing.ok ? bundle.billing.value.period.end : null;
-        const state = billState({
-          soFar,
-          projected: figures.estimateByProject[project.id]?.total ?? (bundle.estimates?.ok ? 0 : null),
-          remainingDays: figures.progress?.remainingDays ?? null,
-          volumeSoFar: usage.cost.volume,
-        });
+        const state = billState({ recent: bundle.recent?.ok ? (bundle.recent.value[project.id] ?? 0) : null, volumeSoFar: usage.cost.volume });
         const volumeShare = usage.cost.volume / soFar;
         const ends = periodEnd ? ` when the billing period ends ${dateNoYear(periodEnd)}` : " when the billing period ends";
         out.push({
@@ -126,14 +121,16 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
           detail: state.charging
             ? [
                 `${money(soFar)} so far this period`,
-                state.perDay != null ? `about ${money(state.perDay)} a day more` : null,
-                usage.cost.volume > 0 ? "volume storage bills every day until the volume is deleted" : "Railway expects more usage before the period ends",
+                state.perDay != null ? `${money(state.perDay)} a day over the last ${RECENT_DAYS} days` : null,
+                usage.cost.volume > 0
+                  ? "likely volume storage, which bills every day until the volume is deleted"
+                  : "something in it is still using resources; open it to check its services",
               ]
                 .filter(Boolean)
                 .join(" · ")
             : state.known
-              ? `Nothing running and no new charges. It was billed while it ran earlier in the period${volumeShare > 0.5 ? " (mostly volume storage, since deleted)" : ""}, and leaves this list${ends}.`
-              : `Nothing running. Railway didn't return a projection, so it isn't clear whether charges stopped; check Billing → Cost history.`,
+              ? `Nothing running and nothing charged in the last ${RECENT_DAYS} days. It was billed while it ran earlier in the period${volumeShare > 0.5 ? " (mostly volume storage, since deleted)" : ""}, and leaves this list${ends}.`
+              : "Nothing running. Recent usage couldn't be read, so it isn't clear whether charges stopped; check Billing → Cost history.",
           href: base,
           at: project.lastDeployAt,
           ongoing: true,

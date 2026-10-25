@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recentWindow } from "../worth-a-look";
 import {
   addMeasurement,
   costOf,
@@ -449,12 +450,14 @@ export type WorkspaceBundle = {
   billing: Settled<BillingView>;
   usage: Settled<UsageView>;
   estimates: Settled<EstimateView> | null;
+  /** Cost per project over the last RECENT_DAYS complete days (only when asked for). */
+  recent: Settled<Record<string, number>> | null;
 };
 
 export async function loadWorkspaceBundle(
   account: AccountConfig,
   workspace: WorkspaceRef,
-  opts: { period?: "current" | "previous"; includeProjects?: boolean } = {},
+  opts: { period?: "current" | "previous"; includeProjects?: boolean; recent?: boolean } = {},
 ): Promise<WorkspaceBundle> {
   const wantPrevious = opts.period === "previous";
   const [projects, billing] = await Promise.all([
@@ -468,14 +471,21 @@ export async function loadWorkspaceBundle(
     period = wantPrevious ? previousPeriod(current, billing.value.anchor) : current;
   }
 
-  const [usage, estimates] = await Promise.all([
+  const [usage, estimates, recent] = await Promise.all([
     wantPrevious && !period
       ? Promise.resolve<Settled<UsageView>>({ ok: false, error: "The previous period needs billing access to know its dates." })
       : settle(loadWorkspaceUsage(account, workspace.id, period)),
     wantPrevious ? Promise.resolve(null) : settle(loadWorkspaceEstimates(account, workspace.id)),
+    opts.recent ? settle(loadRecentCosts(account, workspace.id)) : Promise.resolve(null),
   ]);
 
-  return { account: { key: account.key, label: account.label }, workspace, projects, billing, usage, estimates };
+  return { account: { key: account.key, label: account.label }, workspace, projects, billing, usage, estimates, recent };
+}
+
+/** What each project was charged over the last RECENT_DAYS complete UTC days. */
+export async function loadRecentCosts(account: AccountConfig, workspaceId: string): Promise<Record<string, number>> {
+  const usage = await loadWorkspaceUsage(account, workspaceId, recentWindow());
+  return Object.fromEntries(usage.projects.map((p) => [p.id, p.cost.total]));
 }
 
 // ── Project, environment, service ───────────────────────────────────────────

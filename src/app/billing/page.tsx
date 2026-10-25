@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { CostDonut, type DonutSlice } from "@/components/CostDonut";
 import { Icon } from "@/components/Icon";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
@@ -33,6 +34,7 @@ import {
 } from "@/lib/railway/api";
 import type { Invoice } from "@/lib/railway/types";
 import { workspaceFigures } from "@/lib/summaries";
+import { billStatus, RECENT_DAYS, type BillStatus } from "@/lib/worth-a-look";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -48,7 +50,7 @@ export default async function BillingPage({ searchParams }: Props) {
   const entries = await Promise.all(
     uniqueWorkspaceTargets(accounts).map(async ({ account, workspace }) => {
       const [bundle, invoices] = await Promise.all([
-        loadWorkspaceBundle(account, workspace, { period: which, includeProjects: false }),
+        loadWorkspaceBundle(account, workspace, { period: which, recent: true }),
         settle(loadInvoices(account, workspace.id)),
       ]);
       return { bundle, invoices };
@@ -174,6 +176,60 @@ export default async function BillingPage({ searchParams }: Props) {
   );
 }
 
+const STATUS_SLICES: { key: BillStatus | "deleted"; label: string; color: string; note?: string }[] = [
+  { key: "running", label: "Running now", color: "var(--series-1)" },
+  { key: "charging", label: "Off, still charging", color: "var(--series-2)", note: `charged in the last ${RECENT_DAYS} days` },
+  { key: "stopped", label: "Off, charged earlier", color: "var(--series-3)", note: "nothing charged lately" },
+  { key: "deleted", label: "Deleted projects", color: "var(--series-4)" },
+];
+
+/** This (or last) period's metered cost split two ways: by each project's status today, and by resource. */
+function CostStructure({ bundle, which }: { bundle: WorkspaceBundle; which: "current" | "previous" }) {
+  if (!bundle.usage.ok) return null;
+  const usage = bundle.usage.value;
+  const projects = bundle.projects.ok ? new Map(bundle.projects.value.map((p) => [p.id, p])) : null;
+  const recent = bundle.recent?.ok ? bundle.recent.value : null;
+
+  const byStatus = new Map<string, number>();
+  if (projects) {
+    for (const p of usage.projects) {
+      const project = projects.get(p.id);
+      const key = !project || p.deleted
+        ? "deleted"
+        : billStatus({
+            running: project.health.live + project.health.sleeping,
+            recent: recent ? (recent[p.id] ?? 0) : null,
+            volumeSoFar: p.cost.volume,
+          });
+      byStatus.set(key, (byStatus.get(key) ?? 0) + p.cost.total);
+    }
+  }
+  const statusSlices: DonutSlice[] = STATUS_SLICES.filter((s) => (byStatus.get(s.key) ?? 0) > 0 || s.key !== "deleted").map((s) => ({
+    ...s,
+    value: byStatus.get(s.key) ?? 0,
+  }));
+  const resourceSlices: DonutSlice[] = COST_PARTS.map((p) => ({ key: p.key, label: p.label, color: p.color, value: usage.total[p.key] }));
+
+  return (
+    <section className="border-t border-line p-4" aria-label="Where the money went">
+      <h3 className="text-sm font-semibold">Where the money went</h3>
+      <p className="mt-1 text-xs leading-relaxed text-ink-2">
+        {which === "current" ? "This" : "Last"} period&apos;s metered usage, before the plan&apos;s included amount and fees. Status is each
+        project&apos;s status today; &quot;still charging&quot; means Railway charged it in the last {RECENT_DAYS} full days with nothing running.
+        {!recent && " Recent usage couldn't be read, so for now only an attached volume counts as still charging."}
+      </p>
+      <div className="mt-4 grid gap-8 md:grid-cols-2">
+        {projects ? (
+          <CostDonut title="By status" slices={statusSlices} emptyText="No metered usage in this period." />
+        ) : (
+          <p className="text-sm text-ink-2">The project list couldn&apos;t be read, so the split by status isn&apos;t available.</p>
+        )}
+        <CostDonut title="By resource" slices={resourceSlices} emptyText="No metered usage in this period." />
+      </div>
+    </section>
+  );
+}
+
 function WorkspaceBilling({ bundle, invoices, which }: { bundle: WorkspaceBundle; invoices: Settled<Invoice[]>; which: "current" | "previous" }) {
   const figures = workspaceFigures(bundle);
   const billing = bundle.billing.ok ? bundle.billing.value : null;
@@ -263,6 +319,8 @@ function WorkspaceBilling({ bundle, invoices, which }: { bundle: WorkspaceBundle
           </Kv>
         </div>
       )}
+
+      {usage && <CostStructure bundle={bundle} which={which} />}
 
       {usage && (
         <div className="grid gap-6 border-t border-line p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">

@@ -11,7 +11,7 @@ const require = createRequire(import.meta.url);
 const output = mkdtempSync(join(tmpdir(), "railway-worth-test-"));
 after(() => rmSync(output, { recursive: true, force: true }));
 execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "src/lib/worth-a-look.ts", "--outDir", output, "--module", "commonjs", "--target", "es2020", "--skipLibCheck", "--strict"], { stdio: "inherit" });
-const { DEFAULT_WORTH_RANGE, billState, inWorthRange, isWorthRange, sortWorth, splitWorth } = require(join(output, "worth-a-look.js"));
+const { DEFAULT_WORTH_RANGE, billState, billStatus, inWorthRange, isWorthRange, recentWindow, sortWorth, splitWorth } = require(join(output, "worth-a-look.js"));
 
 const NOW = Date.parse("2026-10-24T12:00:00Z");
 const ago = (days) => new Date(NOW - days * 86_400_000).toISOString();
@@ -48,17 +48,27 @@ test("bill items are listed apart, whatever the range, and never as events", () 
   assert.deepEqual(splitWorth(items, "all", NOW).events.map((x) => x.id), ["crash-today", "crash-old"]);
 });
 
-test("still charging: Railway projects more than used so far", () => {
-  const charging = billState({ soFar: 2, projected: 3.2, remainingDays: 12, volumeSoFar: 0 });
+test("still charging means Railway charged it in the last two full days", () => {
+  const charging = billState({ recent: 0.06, volumeSoFar: 0 });
   assert.equal(charging.charging, true);
-  assert.ok(Math.abs(charging.perDay - 0.1) < 1e-9, String(charging.perDay));
-  assert.deepEqual(billState({ soFar: 2, projected: 2.004, remainingDays: 12, volumeSoFar: 1.5 }), { charging: false, perDay: null, known: true }, "a deleted volume no longer counts");
-  assert.equal(billState({ soFar: 2, projected: 2.5, remainingDays: 0, volumeSoFar: 0 }).perDay, null, "last day: no per-day figure");
+  assert.ok(Math.abs(charging.perDay - 0.03) < 1e-9, String(charging.perDay));
+  assert.deepEqual(billState({ recent: 0, volumeSoFar: 1.5 }), { charging: false, perDay: null, known: true }, "a volume deleted earlier doesn't count");
+  assert.equal(billState({ recent: 0.004, volumeSoFar: 0 }).charging, false, "rounding noise isn't a charge");
 });
 
-test("without a projection, only a volume means still charging", () => {
-  assert.deepEqual(billState({ soFar: 2, projected: null, remainingDays: 12, volumeSoFar: 0.4 }), { charging: true, perDay: null, known: false });
-  assert.deepEqual(billState({ soFar: 2, projected: null, remainingDays: 12, volumeSoFar: 0 }), { charging: false, perDay: null, known: false });
+test("without recent usage, only a volume means still charging", () => {
+  assert.deepEqual(billState({ recent: null, volumeSoFar: 0.4 }), { charging: true, perDay: null, known: false });
+  assert.deepEqual(billState({ recent: null, volumeSoFar: 0 }), { charging: false, perDay: null, known: false });
+});
+
+test("status today: running, still charging, or stopped", () => {
+  assert.equal(billStatus({ running: 1, recent: 0, volumeSoFar: 0 }), "running");
+  assert.equal(billStatus({ running: 0, recent: 0.2, volumeSoFar: 0 }), "charging");
+  assert.equal(billStatus({ running: 0, recent: 0, volumeSoFar: 3 }), "stopped");
+});
+
+test("the recent window is the last two complete UTC days", () => {
+  assert.deepEqual(recentWindow(new Date("2026-10-25T17:15:00Z")), { start: "2026-10-23T00:00:00.000Z", end: "2026-10-25T00:00:00.000Z" });
 });
 
 test("no known time only shows under All", () => {

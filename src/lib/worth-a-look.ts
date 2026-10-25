@@ -53,21 +53,31 @@ export function splitWorth<T extends Billed>(items: T[], range: WorthRange, now:
   return { events, billing, hidden: allEvents.length - events.length };
 }
 
+/** How far back "still charging" looks: the last two complete UTC days. */
+export const RECENT_DAYS = 2;
+
+export function recentWindow(now = new Date()): { start: string; end: string } {
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return { start: new Date(end - RECENT_DAYS * DAY).toISOString(), end: new Date(end).toISOString() };
+}
+
 /**
- * Is a project with nothing running still adding to the bill? Railway's estimate is the project's
- * projected total for the period, so anything above what it has used so far is still to come.
- * Without an estimate, an attached volume is the one thing that keeps billing every day.
+ * Is a project with nothing running still adding to the bill? The evidence is what Railway
+ * actually charged it over the last RECENT_DAYS complete days (not Railway's projection, which
+ * just extends the period so far to the full period). Without that, an attached volume is the one
+ * thing known to keep billing every day.
  */
-export function billState(input: { soFar: number; projected: number | null; remainingDays: number | null; volumeSoFar: number }): {
-  charging: boolean;
-  perDay: number | null;
-  known: boolean;
-} {
-  if (input.projected != null && Number.isFinite(input.projected)) {
-    const left = input.projected - input.soFar;
-    if (left < 0.01) return { charging: false, perDay: null, known: true };
-    const days = input.remainingDays && input.remainingDays > 0 ? input.remainingDays : null;
-    return { charging: true, perDay: days ? left / days : null, known: true };
+export function billState(input: { recent: number | null; volumeSoFar: number }): { charging: boolean; perDay: number | null; known: boolean } {
+  if (input.recent != null && Number.isFinite(input.recent)) {
+    return input.recent >= 0.005 ? { charging: true, perDay: input.recent / RECENT_DAYS, known: true } : { charging: false, perDay: null, known: true };
   }
   return { charging: input.volumeSoFar > 0, perDay: null, known: false };
+}
+
+export type BillStatus = "running" | "charging" | "stopped";
+
+/** Where a project's cost sits today: something running, nothing running but still charged recently, or stopped. */
+export function billStatus(input: { running: number; recent: number | null; volumeSoFar: number }): BillStatus {
+  if (input.running > 0) return "running";
+  return billState(input).charging ? "charging" : "stopped";
 }

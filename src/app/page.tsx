@@ -43,7 +43,7 @@ export default async function OverviewPage() {
   if (accounts.length === 0) return <SetupGuide />;
 
   const bundles: WorkspaceBundle[] = await Promise.all(
-    uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace)),
+    uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace, { recent: true })),
   );
   const allProjects = bundles.flatMap((b) => (b.projects.ok ? b.projects.value : []));
   const unmatchedProtected = bundles.every((b) => b.projects.ok) ? unmatchedProtectedEntries(allProjects) : [];
