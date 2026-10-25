@@ -1,11 +1,11 @@
-import { periodProgress, projectPeriod, type CostBreakdown, type PeriodProjection } from "./billing";
+import { COST_PARTS, emptyCost, periodProgress, projectPeriod, type CostBreakdown, type PeriodProjection } from "./billing";
 import { isProtectedProject } from "./config";
 import { dateNoYear, money, plural, relative } from "./format";
 import { isOnlineHealth } from "./health";
 import type { ProjectSummary, ProjectUsage, WorkspaceBundle } from "./railway/api";
 import type { ServiceCatalogRow } from "./service-row";
 import { DEFAULT_SERVICE_SORT, sortServiceRows } from "./service-stats";
-import { billState, RECENT_DAYS } from "./worth-a-look";
+import { billState, billStatus, RECENT_DAYS, type StatusKey } from "./worth-a-look";
 
 export type { ServiceCatalogRow };
 
@@ -108,7 +108,9 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
       if (project.health.live + project.health.sleeping === 0 && usage && usage.cost.total >= 0.01) {
         const soFar = usage.cost.total;
         const periodEnd = bundle.billing.ok ? bundle.billing.value.period.end : null;
-        const state = billState({ recent: bundle.recent?.ok ? (bundle.recent.value[project.id] ?? 0) : null, volumeSoFar: usage.cost.volume });
+        const recentCost = bundle.recent?.ok ? (bundle.recent.value[project.id] ?? emptyCost()) : null;
+        const state = billState({ recent: recentCost?.total ?? null, volumeSoFar: usage.cost.volume });
+        const part = recentCost ? mainCostPart(recentCost) : null;
         const volumeShare = usage.cost.volume / soFar;
         const ends = periodEnd ? ` when the billing period ends ${dateNoYear(periodEnd)}` : " when the billing period ends";
         out.push({
@@ -121,10 +123,12 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
           detail: state.charging
             ? [
                 `${money(soFar)} so far this period`,
-                state.perDay != null ? `${money(state.perDay)} a day over the last ${RECENT_DAYS} days` : null,
-                usage.cost.volume > 0
-                  ? "likely volume storage, which bills every day until the volume is deleted"
-                  : "something in it is still using resources; open it to check its services",
+                state.perDay != null ? `${money(state.perDay)} a day over the last ${RECENT_DAYS} days${part ? `, mostly ${part.label}` : ""}` : null,
+                part?.key === "volume" || part?.key === "backup" || (!part && usage.cost.volume > 0)
+                  ? "volume storage bills every day until the volume is deleted"
+                  : part?.key === "egress"
+                    ? "something is still sending network traffic; open it to check its services"
+                    : "CPU or memory means a deployment is still running somewhere; open it and check every environment",
               ]
                 .filter(Boolean)
                 .join(" · ")
@@ -213,4 +217,65 @@ export function serviceCatalog(bundles: WorkspaceBundle[]): ServiceCatalogRow[] 
   }
 
   return sortServiceRows(rows, DEFAULT_SERVICE_SORT);
+}
+
+// ── Bill structure (Overview summary and Billing charts) ───────────────────
+
+const addCost = (into: CostBreakdown, add: CostBreakdown, scale = 1) => {
+  for (const key of Object.keys(into) as (keyof CostBreakdown)[]) into[key] += add[key] * scale;
+};
+
+export type BillStructure = {
+  /** The period's metered cost by each project's status today. */
+  byStatus: Record<StatusKey, number>;
+  /** The period's metered cost by resource. */
+  byResource: CostBreakdown;
+  /** Projects with nothing running that Railway charged in the last RECENT_DAYS days: per day, and by resource. */
+  charging: { projects: number; perDay: number; perDayByResource: CostBreakdown; toPeriodEnd: number };
+  /** False when a workspace's recent usage couldn't be read (still-charging then relies on volumes). */
+  recentKnown: boolean;
+};
+
+export function billStructure(bundles: WorkspaceBundle[]): BillStructure {
+  const byStatus: Record<StatusKey, number> = { running: 0, charging: 0, stopped: 0, deleted: 0, unknown: 0 };
+  const byResource = emptyCost();
+  const charging = { projects: 0, perDay: 0, perDayByResource: emptyCost(), toPeriodEnd: 0 };
+  let recentKnown = true;
+
+  for (const bundle of bundles) {
+    if (!bundle.usage.ok) continue;
+    const projects = bundle.projects.ok ? new Map(bundle.projects.value.map((p) => [p.id, p])) : null;
+    const recent = bundle.recent?.ok ? bundle.recent.value : null;
+    if (!recent) recentKnown = false;
+    const remainingDays = workspaceFigures(bundle).progress?.remainingDays ?? 0;
+
+    for (const p of bundle.usage.value.projects) {
+      addCost(byResource, p.cost);
+      const project = projects?.get(p.id);
+      let key: StatusKey;
+      if (!projects) key = "unknown";
+      else if (!project || p.deleted) key = "deleted";
+      else {
+        key = billStatus({ running: project.health.live + project.health.sleeping, recent: recent ? (recent[p.id]?.total ?? 0) : null, volumeSoFar: p.cost.volume });
+      }
+      byStatus[key] += p.cost.total;
+      if (key === "charging") {
+        charging.projects++;
+        const r = recent?.[p.id];
+        if (r) {
+          charging.perDay += r.total / RECENT_DAYS;
+          charging.toPeriodEnd += (r.total / RECENT_DAYS) * remainingDays;
+          addCost(charging.perDayByResource, r, 1 / RECENT_DAYS);
+        }
+      }
+    }
+  }
+  return { byStatus, byResource, charging, recentKnown };
+}
+
+/** The biggest part of a cost, as a lowercase phrase ("memory", "volume storage"). */
+export function mainCostPart(cost: CostBreakdown): { key: keyof Omit<CostBreakdown, "total">; label: string } | null {
+  let best: (typeof COST_PARTS)[number] | null = null;
+  for (const part of COST_PARTS) if (cost[part.key] > 0 && (!best || cost[part.key] > cost[best.key])) best = part;
+  return best ? { key: best.key, label: best.label.toLowerCase() } : null;
 }

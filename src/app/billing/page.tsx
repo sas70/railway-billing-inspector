@@ -33,8 +33,8 @@ import {
   type WorkspaceBundle,
 } from "@/lib/railway/api";
 import type { Invoice } from "@/lib/railway/types";
-import { workspaceFigures } from "@/lib/summaries";
-import { billStatus, RECENT_DAYS, type BillStatus } from "@/lib/worth-a-look";
+import { billStructure, workspaceFigures } from "@/lib/summaries";
+import { RECENT_DAYS, STATUS_PARTS } from "@/lib/worth-a-look";
 
 export const metadata: Metadata = { title: "Billing" };
 
@@ -176,39 +176,15 @@ export default async function BillingPage({ searchParams }: Props) {
   );
 }
 
-const STATUS_SLICES: { key: BillStatus | "deleted"; label: string; color: string; note?: string }[] = [
-  { key: "running", label: "Running now", color: "var(--series-1)" },
-  { key: "charging", label: "Off, still charging", color: "var(--series-2)", note: `charged in the last ${RECENT_DAYS} days` },
-  { key: "stopped", label: "Off, charged earlier", color: "var(--series-3)", note: "nothing charged lately" },
-  { key: "deleted", label: "Deleted projects", color: "var(--series-4)" },
-];
-
 /** This (or last) period's metered cost split two ways: by each project's status today, and by resource. */
 function CostStructure({ bundle, which }: { bundle: WorkspaceBundle; which: "current" | "previous" }) {
   if (!bundle.usage.ok) return null;
-  const usage = bundle.usage.value;
-  const projects = bundle.projects.ok ? new Map(bundle.projects.value.map((p) => [p.id, p])) : null;
-  const recent = bundle.recent?.ok ? bundle.recent.value : null;
-
-  const byStatus = new Map<string, number>();
-  if (projects) {
-    for (const p of usage.projects) {
-      const project = projects.get(p.id);
-      const key = !project || p.deleted
-        ? "deleted"
-        : billStatus({
-            running: project.health.live + project.health.sleeping,
-            recent: recent ? (recent[p.id] ?? 0) : null,
-            volumeSoFar: p.cost.volume,
-          });
-      byStatus.set(key, (byStatus.get(key) ?? 0) + p.cost.total);
-    }
-  }
-  const statusSlices: DonutSlice[] = STATUS_SLICES.filter((s) => (byStatus.get(s.key) ?? 0) > 0 || s.key !== "deleted").map((s) => ({
+  const structure = billStructure([bundle]);
+  const statusSlices: DonutSlice[] = STATUS_PARTS.filter((s) => structure.byStatus[s.key] > 0 || ["running", "charging", "stopped"].includes(s.key)).map((s) => ({
     ...s,
-    value: byStatus.get(s.key) ?? 0,
+    value: structure.byStatus[s.key],
   }));
-  const resourceSlices: DonutSlice[] = COST_PARTS.map((p) => ({ key: p.key, label: p.label, color: p.color, value: usage.total[p.key] }));
+  const resourceSlices: DonutSlice[] = COST_PARTS.map((p) => ({ key: p.key, label: p.label, color: p.color, value: structure.byResource[p.key] }));
 
   return (
     <section className="border-t border-line p-4" aria-label="Where the money went">
@@ -216,14 +192,10 @@ function CostStructure({ bundle, which }: { bundle: WorkspaceBundle; which: "cur
       <p className="mt-1 text-xs leading-relaxed text-ink-2">
         {which === "current" ? "This" : "Last"} period&apos;s metered usage, before the plan&apos;s included amount and fees. Status is each
         project&apos;s status today; &quot;still charging&quot; means Railway charged it in the last {RECENT_DAYS} full days with nothing running.
-        {!recent && " Recent usage couldn't be read, so for now only an attached volume counts as still charging."}
+        {!structure.recentKnown && " Recent usage couldn't be read, so for now only an attached volume counts as still charging."}
       </p>
       <div className="mt-4 grid gap-8 md:grid-cols-2">
-        {projects ? (
-          <CostDonut title="By status" slices={statusSlices} emptyText="No metered usage in this period." />
-        ) : (
-          <p className="text-sm text-ink-2">The project list couldn&apos;t be read, so the split by status isn&apos;t available.</p>
-        )}
+        <CostDonut title="By status" slices={statusSlices} emptyText="No metered usage in this period." />
         <CostDonut title="By resource" slices={resourceSlices} emptyText="No metered usage in this period." />
       </div>
     </section>

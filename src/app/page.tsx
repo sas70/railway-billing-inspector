@@ -32,7 +32,7 @@ import { dateNoYear, money, plural, relative } from "@/lib/format";
 import { emptyHealthCounts, needsAttention } from "@/lib/health";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
 import { blurbText, type RepoBlurb } from "@/lib/repo-blurb";
-import { cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
+import { billStructure, cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -145,7 +145,7 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      {candidates.length > 0 && <WorthALook candidates={candidates} renderedAt={Date.now()} />}
+      {candidates.length > 0 && <WorthALook candidates={candidates} structure={billStructure(bundles)} renderedAt={Date.now()} />}
 
       {bundles.map((bundle) => (
         <WorkspaceSection

@@ -81,3 +81,14 @@ export function billStatus(input: { running: number; recent: number | null; volu
   if (input.running > 0) return "running";
   return billState(input).charging ? "charging" : "stopped";
 }
+
+export type StatusKey = BillStatus | "deleted" | "unknown";
+
+/** Status slices in fixed order, so a slice keeps its color whatever else is present. */
+export const STATUS_PARTS: { key: StatusKey; label: string; color: string; note?: string }[] = [
+  { key: "running", label: "Running now", color: "var(--series-1)" },
+  { key: "charging", label: "Off, still charging", color: "var(--series-2)", note: `charged in the last ${RECENT_DAYS} days` },
+  { key: "stopped", label: "Off, charged earlier", color: "var(--series-3)", note: "nothing charged lately" },
+  { key: "deleted", label: "Deleted projects", color: "var(--series-4)" },
+  { key: "unknown", label: "Status unknown", color: "var(--series-5)", note: "project list couldn't be read" },
+];

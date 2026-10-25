@@ -5,20 +5,25 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Icon } from "@/components/Icon";
 import { Badge, Card, CardHeader } from "@/components/ui";
-import type { Candidate } from "@/lib/summaries";
-import { DEFAULT_WORTH_RANGE, WORTH_RANGES, isWorthRange, splitWorth, type WorthRange } from "@/lib/worth-a-look";
+import { COST_PARTS } from "@/lib/billing";
+import { money, plural } from "@/lib/format";
+import type { BillStructure, Candidate } from "@/lib/summaries";
+import { CostDonut } from "./CostDonut";
+import { DEFAULT_WORTH_RANGE, RECENT_DAYS, STATUS_PARTS, WORTH_RANGES, isWorthRange, splitWorth, type WorthRange } from "@/lib/worth-a-look";
 
 const STORAGE_KEY = "rbi-worth-range";
 const SHOWN = 10;
+const BILL_SHOWN = 4;
 
 /**
  * "Worth a look": what happened (crashes, failed deploys), filtered by Today / This week / This
  * month / This year / All (remembered per browser), and, apart from that, what is on this
  * period's bill. The filter never applies to the bill part.
  */
-export function WorthALook({ candidates, renderedAt }: { candidates: Candidate[]; renderedAt: number }) {
+export function WorthALook({ candidates, structure, renderedAt }: { candidates: Candidate[]; structure: BillStructure | null; renderedAt: number }) {
   const [range, setRange] = useState<WorthRange>(DEFAULT_WORTH_RANGE);
   const [expanded, setExpanded] = useState(false);
+  const [billExpanded, setBillExpanded] = useState(false);
 
   useEffect(() => {
     try {
@@ -122,7 +127,15 @@ export function WorthALook({ candidates, renderedAt }: { candidates: Candidate[]
               Daily cost by project →
             </Link>
           </div>
-          <ItemList items={billing} tag />
+          {structure && <BillSummary structure={structure} />}
+          <ItemList items={billExpanded ? billing : billing.slice(0, BILL_SHOWN)} tag />
+          {billing.length > BILL_SHOWN && (
+            <p className="border-t border-line px-4 py-2 text-xs">
+              <button type="button" className="font-medium text-link underline-offset-2 hover:underline" onClick={() => setBillExpanded((e) => !e)}>
+                {billExpanded ? "Show fewer" : `Show all ${billing.length} projects`}
+              </button>
+            </p>
+          )}
         </section>
       )}
     </Card>
@@ -159,5 +172,51 @@ function ItemList({ items, tag = false }: { items: Candidate[]; tag?: boolean })
         </li>
       ))}
     </ul>
+  );
+}
+
+/** The high-level picture before the project list: what is still charging, and where this period's money went. */
+function BillSummary({ structure }: { structure: BillStructure }) {
+  const { charging } = structure;
+  const statusSlices = STATUS_PARTS.filter((s) => structure.byStatus[s.key] > 0 || ["running", "charging", "stopped"].includes(s.key)).map((s) => ({
+    ...s,
+    value: structure.byStatus[s.key],
+  }));
+  const showChargingParts = charging.projects > 0 && charging.perDay >= 0.005;
+  const resourceSlices = COST_PARTS.map((p) => ({
+    key: p.key,
+    label: p.label,
+    color: p.color,
+    value: showChargingParts ? charging.perDayByResource[p.key] : structure.byResource[p.key],
+  }));
+
+  return (
+    <div className="grid gap-6 border-b border-line px-5 py-4 lg:grid-cols-[minmax(0,0.75fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="rounded-lg border border-line bg-page p-4">
+        <div className="text-xs font-medium text-ink-2">Off, but still charging</div>
+        {charging.projects > 0 ? (
+          <>
+            <div className="mt-1 text-3xl font-semibold tracking-tight tabular">
+              {money(charging.perDay)}
+              <span className="text-base font-normal text-ink-2"> a day</span>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-ink-2">
+              {plural(charging.projects, "project")} with nothing running, from what Railway charged over the last {RECENT_DAYS} full days.
+              {charging.toPeriodEnd >= 0.01 && ` About ${money(charging.toPeriodEnd)} more before the billing period ends.`}
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-sm">Nothing. Every project with nothing running has stopped costing money.</p>
+        )}
+        {!structure.recentKnown && <p className="mt-2 text-xs text-ink-2">Recent usage couldn&apos;t be read for every workspace, so this may be incomplete.</p>}
+      </div>
+      <CostDonut title="This period, by status" slices={statusSlices} emptyText="No metered usage this period." />
+      <CostDonut
+        title={showChargingParts ? "What they're charged for, per day" : "This period, by resource"}
+        slices={resourceSlices}
+        emptyText="No metered usage this period."
+        centerLabel={showChargingParts ? "a day" : "total"}
+      />
+    </div>
   );
 }

@@ -451,7 +451,7 @@ export type WorkspaceBundle = {
   usage: Settled<UsageView>;
   estimates: Settled<EstimateView> | null;
   /** Cost per project over the last RECENT_DAYS complete days (only when asked for). */
-  recent: Settled<Record<string, number>> | null;
+  recent: Settled<Record<string, CostBreakdown>> | null;
 };
 
 export async function loadWorkspaceBundle(
@@ -483,9 +483,9 @@ export async function loadWorkspaceBundle(
 }
 
 /** What each project was charged over the last RECENT_DAYS complete UTC days. */
-export async function loadRecentCosts(account: AccountConfig, workspaceId: string): Promise<Record<string, number>> {
+export async function loadRecentCosts(account: AccountConfig, workspaceId: string): Promise<Record<string, CostBreakdown>> {
   const usage = await loadWorkspaceUsage(account, workspaceId, recentWindow());
-  return Object.fromEntries(usage.projects.map((p) => [p.id, p.cost.total]));
+  return Object.fromEntries(usage.projects.map((p) => [p.id, p.cost]));
 }
 
 // ── Project, environment, service ───────────────────────────────────────────

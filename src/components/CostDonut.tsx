@@ -24,7 +24,7 @@ function arc(start: number, end: number): string {
  * so nothing depends on color alone. Slices under half a cent are left out of the ring but stay
  * in the legend.
  */
-export function CostDonut({ title, slices, emptyText }: { title: string; slices: DonutSlice[]; emptyText: string }) {
+export function CostDonut({ title, slices, emptyText, centerLabel = "total" }: { title: string; slices: DonutSlice[]; emptyText: string; centerLabel?: string }) {
   const total = slices.reduce((sum, s) => sum + Math.max(0, s.value), 0);
   const drawn = slices.filter((s) => s.value >= 0.005);
   let angle = 0;
@@ -56,7 +56,7 @@ export function CostDonut({ title, slices, emptyText }: { title: string; slices:
             </svg>
             <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
               <span className="text-base font-semibold tabular">{money(total)}</span>
-              <span className="text-[11px] text-ink-2">total</span>
+              <span className="text-[11px] text-ink-2">{centerLabel}</span>
             </div>
           </div>
           <table className="min-w-[14rem] flex-1 text-sm">
