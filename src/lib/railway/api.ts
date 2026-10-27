@@ -648,7 +648,7 @@ export async function loadServiceMetrics(
   range: MetricRange,
 ): Promise<ServiceMetricsView> {
   const spec = METRIC_RANGES[range];
-  // Round the window to the step so the 30s cache is actually hit between page loads.
+  // Round the window to the step so repeat views of the same chart hit the cache.
   const end = Math.floor(Date.now() / 1000 / spec.step) * spec.step;
   const start = end - spec.seconds;
   const { metrics } = await railwayRequest<T.MetricsResult>(account, D.ServiceMetrics, {

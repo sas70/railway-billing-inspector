@@ -21,6 +21,7 @@ With it I took every project offline in one click, then turned back on only the 
 - **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment, the deployment history with bulk actions and logs, and a red **Open in Railway** link for that service.
 - **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits, the next invoice, invoices with PDF links, and cost by project and resource. **Where the money went** shows two donuts per workspace: the period's cost by each project's status today (running now, off but still charging, off and charged earlier, deleted) and by resource (CPU, memory, egress, volumes, backups). Also available for the previous period.
 - **Cost history.** Open **Billing → Cost history** to compare the last 7 or 30 complete UTC days with the preceding equal window. Projects are ranked by absolute spending change, with dollar and percentage differences, increase/decrease filters, search, and expandable resource changes. Deleted projects are included; workspaces missing either range are excluded from both totals. This compares metered resource costs at current list prices, excluding plan fees, included usage, credits and tax. Today is excluded to avoid comparing a partial day.
+- **Moving between tabs.** Each page keeps what it read from Railway, so going back and forth between tabs (or using the browser's Back button) shows the saved copy instead of reading Railway again. After the first page opens, the other tabs and last billing period are read in the background. **Refresh**, at the top right, throws away every saved copy and reads everything again; the label next to it says how old what you're looking at is. Saved copies are also thrown away after any change you make from the dashboard, and after an hour at most.
 - **Audit log.** Every approved action, with the phrase used to approve it and Railway's answer. You can export it as CSV and cancel scheduled project deletions from here.
 
 ---
@@ -35,7 +36,7 @@ With it I took every project offline in one click, then turned back on only the 
 6. **Run:** `npm run dev`, then open <http://127.0.0.1:3100>.
 
 To try it without a token, run `npm run demo`. It uses built-in fake data, and nothing is sent to Railway.
-For everyday use you can run `npm run build` once, then `npm start`, which is faster than dev mode.
+For everyday use run `npm run app` instead. It builds the dashboard, then starts the faster production server, where every tab is preloaded in the background so switching tabs is instant. In `npm run dev`, a tab shows straight away from the second visit on, and the first visit is quick because its Railway data is already read.
 
 ### Making changes
 
@@ -150,7 +151,7 @@ These use a 30-day month (43,200 minutes). Other inputs:
 - **`DASHBOARD_READ_ONLY=true`** turns off every action, and the server refuses writes too.
 - **`PROTECTED_PROJECTS`** lists projects, by name or ID, that can't be changed from here at all; only cancelling a scheduled deletion is still allowed. The Overview warns you about entries that match no project, so a typo can't silently leave a project unprotected.
 - **Confirmation phrases prevent accidents.** They are not authentication. Access control comes from the localhost binding and the optional password.
-- **API rate limits.** Railway allows 1,000 requests/hour on Hobby and 10,000 on Pro. Reads are cached for 30 s, at most 4 requests per token run at once, and the footer shows your remaining hourly budget. **Refresh** skips the cache.
+- **API rate limits.** Railway allows 1,000 requests/hour on Hobby and 10,000 on Pro. Reads are kept until you press **Refresh** (at most an hour, and cleared after any change made from here), at most 4 requests per token run at once, and the footer shows your remaining hourly budget.
 
 ---
 
@@ -199,10 +200,11 @@ src/
     project-name.ts                  Spots names that look like Railway's random adjective-noun ones
     railway-links.ts                 railway.com project and service dashboard URLs
     railway/documents.ts             Every GraphQL query/mutation (validated by check:queries; includes projectUpdate)
-    railway/client.ts                Transport: auth, 30 s cache, concurrency, retries, errors
+    railway/client.ts                Transport: auth, read cache, concurrency, retries, errors
     railway/api.ts                   Data loading + usage aggregation
     railway/mock.ts                  Demo-mode fake Railway
     billing.ts                       Unit prices, cost math, plan terms, periods
+    preload.ts                       Which tabs are read in the background, and how long the browser keeps pages (used by Preloader and next.config.ts)
     audit.ts, config.ts, health.ts, format.ts
   components/                        UI (review dialogs, ProjectRename, RenameTable, HoverLink, OverviewSearch, RailwayLink, ServicesTable, charts, …)
   proxy.ts                           Optional password gate

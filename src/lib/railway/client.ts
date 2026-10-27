@@ -9,8 +9,11 @@ export { RailwayApiError, errorMessage } from "./errors";
 
 export const RAILWAY_ENDPOINT = "https://backboard.railway.com/graphql/v2";
 
-/** Reads are cached briefly so drilling around doesn't burn the hourly API budget. */
-const QUERY_TTL_MS = 30_000;
+/**
+ * Reads are kept until Refresh (or a change made from this app) clears them, so moving between
+ * tabs never re-reads Railway. The hour is only a backstop for a dashboard left open overnight.
+ */
+export const QUERY_TTL_MS = 60 * 60_000;
 /** Railway allows 10 req/s on Hobby; keep well under it per token. */
 const MAX_IN_FLIGHT_PER_ACCOUNT = 4;
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -19,7 +22,7 @@ const MAX_AUTO_RETRY_WAIT_S = 10;
 
 export type RateInfo = { limit?: number; remaining?: number; reset?: string; updatedAt: number };
 
-type CacheEntry = { expires: number; data: unknown };
+type CacheEntry = { expires: number; fetchedAt: number; data: unknown };
 type Limiter = { active: number; queue: (() => void)[] };
 
 // Module state lives on globalThis so it survives hot reloads in `next dev`.
@@ -28,11 +31,14 @@ const store = globalThis as typeof globalThis & {
   __rbiInflight?: Map<string, Promise<unknown>>;
   __rbiRate?: Map<string, RateInfo>;
   __rbiLimiters?: Map<string, Limiter>;
+  __rbiGeneration?: { value: number };
 };
 const cache = (store.__rbiCache ??= new Map<string, CacheEntry>());
 const inflight = (store.__rbiInflight ??= new Map<string, Promise<unknown>>());
 const rateInfo = (store.__rbiRate ??= new Map<string, RateInfo>());
 const limiters = (store.__rbiLimiters ??= new Map<string, Limiter>());
+/** Bumped on every clear, so a read that was already in flight can't put old data back. */
+const generation = (store.__rbiGeneration ??= { value: 0 });
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -84,11 +90,25 @@ export function getRateInfo(accountKey: string): RateInfo | undefined {
 }
 
 export function clearCache(accountKey?: string) {
+  generation.value++;
   if (!accountKey) {
     cache.clear();
+    inflight.clear();
     return;
   }
   for (const key of cache.keys()) if (key.startsWith(`${accountKey}|`)) cache.delete(key);
+  for (const key of inflight.keys()) if (key.startsWith(`${accountKey}|`)) inflight.delete(key);
+}
+
+/** When the oldest cached read was fetched (ms since epoch), or null when nothing is cached. */
+export function oldestCachedAt(): number | null {
+  const now = Date.now();
+  let oldest: number | null = null;
+  for (const entry of cache.values()) {
+    if (entry.expires <= now) continue;
+    if (oldest == null || entry.fetchedAt < oldest) oldest = entry.fetchedAt;
+  }
+  return oldest;
 }
 
 function parseRetryAfter(value: string | null): number {
@@ -200,7 +220,7 @@ async function execute<T>(account: AccountConfig, doc: GqlDoc, variables: Record
 
 /**
  * Send one GraphQL operation to Railway with the account's token.
- * - Queries: cached for 30s (per account + variables), de-duplicated while in flight.
+ * - Queries: cached until Refresh, at most an hour (per account + variables), de-duplicated while in flight.
  * - Mutations: never cached; a mutation clears that account's cache.
  * - Any `errors` entry throws — Railway reports auth failures as HTTP 200 + errors.
  */
@@ -228,9 +248,13 @@ export async function railwayRequest<T>(
     if (pending) return pending as Promise<T>;
   }
 
+  const startedIn = generation.value;
   const promise = withSlot(account.key, () => execute<T>(account, doc, variables))
     .then((data) => {
-      cache.set(cacheKey, { expires: Date.now() + QUERY_TTL_MS, data });
+      if (generation.value === startedIn) {
+        const now = Date.now();
+        cache.set(cacheKey, { expires: now + QUERY_TTL_MS, fetchedAt: now, data });
+      }
       return data;
     })
     .finally(() => {
