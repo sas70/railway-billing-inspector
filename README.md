@@ -4,6 +4,8 @@ A local Next.js dashboard for your Railway account(s). See every project and its
 
 **See it in action:** [railway-billing-inspector.vercel.app](https://railway-billing-inspector.vercel.app) — demo data only, nothing is sent to Railway. For your own account, run it locally with a token (below).
 
+**New in 0.2.0:** projects that are off but still charging, a bill summary by status and resource, a bulk rename table, and tabs that stay loaded. See the [changelog](CHANGELOG.md).
+
 **What's next:** see the [roadmap](ROADMAP.md), or the [interactive roadmap](https://railway-billing-inspector.vercel.app/roadmap.html) to vote, comment and suggest features.
 
 ## Why I built this
@@ -13,6 +15,18 @@ I was looking at my recent Railway bills — almost **$120 a month** across **94
 With it I took every project offline in one click, then turned back on only the ones I still needed.
 
 ![Services page after cleanup: 94 services, 1 online, 93 offline](docs/dashboard-after-cleanup.jpg)
+
+These numbers come from one of my Railway accounts. I run several Railway accounts and a few on Vercel, so this is a slice of what I spend on hosting, not the whole of it.
+
+### What I found after the cleanup
+
+The cleanup on September 25 took that workspace from about $1.74 of usage a day to $0.20. But nearly all of the $0.20 left was for projects with nothing running. Over the 90 days to October 26, Railway charged **$14.79 of usage** for **14 projects** whose deployment history shows nothing running, 99% of it for memory. That's small, and on a plan whose fee covers its included usage it may not add to the invoice, but it shows up every day and it's easy to miss in Railway's own dashboard. Version 0.2.0 flags these projects as **Off, but still charging**.
+
+![Usage per day in one workspace: about $1.74 a day until the September 25 cleanup, then $0.20 a day, nearly all of it for projects with nothing running](docs/idle-usage-per-day.png)
+
+![$14.79 charged with nothing running across 14 projects in 90 days, led by heroic-contentment at $3.20](docs/idle-charges-by-project.png)
+
+Run it on your account and tell me what you find, and what the cause turned out to be: [open an issue](https://github.com/sas70/railway-billing-inspector/issues/new) or reply on my LinkedIn post.
 
 - **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. Pick **Today / This week / This month / This year / All** to see only recent crashes and failed deploys (This week by default, remembered per browser). Below them, **Still on this period's bill** lists PR environments still running and projects with nothing running that have charges this billing period, whatever the date filter. Each one says whether it is **still charging** (Railway charged it in the last 2 full days with nothing running, usually an attached volume; with the cost per day) or was **charged earlier and stopped** (it drops off when the period ends), with a link to daily cost by project. Above that list, a summary shows what projects with nothing running cost per day (and roughly by period end), this period's cost by status, and what those projects are charged for (CPU, memory, egress or volume storage), so you can see why before opening each one. Search covers every workspace and account (name, domain, service, project ID). Under each project name: the public `*.up.railway.app` (or custom) domain, then a red **Open in Railway** link to `https://railway.com/project/<id>` so you can jump straight into Railway's dashboard. **Rename** sits under that. Names that look like the random two-word ones Railway picks, such as `steadfast-fascination`, are marked **generated name**; enable Write mode, type a clearer name, then review and approve. To rename several at once, open **Rename projects** (see [below](#rename-several-projects-at-once)). **Hover over a project name** to see what its code does: the saved Claude summary when there is one, otherwise the README of your local clone. These cards read local files only, so a repo that is only on GitHub shows one once it has been summarized.
 - **Search.** Find a project by what it does, not the name Railway generated. **Search → Project catalog** lists every project with a one-line summary pulled from its repo's README. Type a query to search project details, READMEs and the code itself, with options for regex, match case, path filter, workspace and status. Code is read **read-only** from your local clones (`CODE_LOCAL_ROOTS`, matched by each clone's GitHub remote) or from GitHub (`GITHUB_TOKEN`, or your `gh` CLI login when running locally). Nothing is cloned, pulled or changed. Each project page also gets an **About this app** card. With `ANTHROPIC_API_KEY` set, **Summarize with Claude** reads each repo's code (file tree, README, manifests, entry points) and writes a short summary. Each summary is saved inside that clone at `.railway-inspector/summary.json`, git-ignored through `.git/info/exclude`; repos that exist only on GitHub are saved under `data/code-summaries/`. Every summary is stamped with its commit and is regenerated automatically only when the code changes. **Copy to Railway descriptions** then writes each summary into its project's Railway description, so it shows up in Railway's own dashboard and anywhere else the project is listed (see [below](#copy-summaries-into-railway-descriptions)).

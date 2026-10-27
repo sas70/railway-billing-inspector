@@ -261,6 +261,8 @@
   const FEATURES = [
     { icon: "grid", title: "Overview", text: "Every workspace and project at a glance: health, cost so far and projected, plus a list of crashed services, failed deploys and forgotten PR environments." },
     { icon: "clock", title: "Worth a look, by time", isNew: true, text: "Show only what happened today, this week, this month or this year. Charges get their own list, saying whether each is still charging or stopped earlier." },
+    { icon: "wallet", title: "Off, but still charging", isNew: true, text: "Projects with nothing running that Railway charged in the last 2 days, with the cost per day and what it's for, plus a summary of the bill by status and by resource." },
+    { icon: "clock", title: "Tabs stay loaded", isNew: true, text: "The other tabs load in the background and come up instantly. One Refresh button reads everything from Railway again." },
     { icon: "server", title: "Services", text: "Every service in one sortable table, newest deploy first, with Turn on / Turn off and bulk on/off, each reviewed first." },
     { icon: "folder", title: "Project and service pages", text: "Cost by service and resource, environments, volumes, CPU, memory and egress charts, deployment history and logs." },
     { icon: "wallet", title: "Billing and cost history", text: "Usage against your plan, projected cost, invoices, and a 7- or 30-day comparison of what changed." },
@@ -288,6 +290,11 @@
       id: "assistant-confirm", stage: "next", title: "AI assistant: propose and confirm",
       summary: "The assistant drafts the change and shows the same review the buttons show. Nothing runs until you click Confirm.",
       details: ["Write mode, protected projects and the re-check before each change still apply", "Destructive actions still need their typed phrase", "Every change goes in the audit log"],
+    },
+    {
+      id: "rotate-secrets", stage: "next", title: "Rotate secrets in one go",
+      summary: "After a breach like Railway's October 21 incident, replace every stored credential without going service by service.",
+      details: ["Lists variables that look like secrets across all projects, names only, never values", "Groups services that share a secret, so one new value updates all of them", "You paste the new key from its provider, review every change, and the services redeploy", "Every change goes in the audit log"],
     },
     {
       id: "assistant-jobs", stage: "future", title: "AI assistant: multi-step jobs",

@@ -32,6 +32,15 @@ The assistant drafts the change and shows the same review the buttons show today
 - Write mode, protected projects and the re-check before each change all still apply.
 - Destructive actions still need their typed phrase, and every change goes in the audit log.
 
+### Rotate secrets in one go
+
+After a breach like Railway's [October 21 security incident](https://railway.com/changelog/2026-10-23-october-21-security-incident), Railway asks you to replace every credential stored in your variables. Doing that service by service is slow and easy to get wrong.
+
+- Lists every variable that looks like a secret (API keys, tokens, database URLs, passwords) across all your projects. Names only: values are never shown.
+- Groups the services that share the same secret, so one new value updates all of them.
+- You get the new key from its provider (Stripe, OpenAI, your database), paste it once, review every change, and the services redeploy.
+- Logged in the audit log, like every other change.
+
 ## Future: later
 
 ### AI assistant, step 3: multi-step jobs
@@ -47,6 +56,9 @@ One request runs a whole chore, such as "summarize my new apps, copy the descrip
 
 **New in this release**
 
+- **Off, but still charging.** Projects with nothing running that Railway actually charged in the last 2 days, with the cost per day and what it's for (CPU, memory, network or storage).
+- **Bill summary first.** Above the project list: what idle projects cost per day, this period's cost by status, and what they're charged for. The Billing page shows the same split for this and last period.
+- **Tabs stay loaded.** The other tabs load in the background and come up instantly. One Refresh button reads everything again.
 - **Rename projects.** Swap Railway's random names like `steadfast-fascination` for names that say what each app does, several at once. Names are suggested from each app's saved summary (or its repo name), the random ones are ticked for you, and one review covers every old → new name.
 - **Hover summaries.** Hover a project or service name to see what its code does.
 - **Railway descriptions.** Copy each app's saved summary into its Railway project description, after one review.
