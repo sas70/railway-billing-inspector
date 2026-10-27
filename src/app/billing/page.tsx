@@ -117,7 +117,7 @@ export default async function BillingPage({ searchParams }: Props) {
               {(["current", "previous"] as const).map((p) => (
                 <Link
                   key={p}
-                  href={`/billing?period=${p}`}
+                  href={p === "current" ? "/billing" : "/billing?period=previous"}
                   aria-current={p === which ? "true" : undefined}
                   className={`rounded px-3 py-1 ${p === which ? "bg-surface-2 font-medium" : "text-ink-2 hover:text-ink"}`}
                 >

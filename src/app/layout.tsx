@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { NavLink } from "@/components/NavLink";
+import { Preloader } from "@/components/Preloader";
 import { RefreshButton } from "@/components/RefreshButton";
 import { WriteModeToggle } from "@/components/WriteModeToggle";
 import { Badge } from "@/components/ui";
 import { getAccounts, isEnvReadOnly, isMockMode } from "@/lib/config";
-import { getRateInfo } from "@/lib/railway/client";
+import { getRateInfo, oldestCachedAt } from "@/lib/railway/client";
 
 import "./globals.css";
 
@@ -33,7 +34,7 @@ function Footer() {
   return (
     <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-ink-2 sm:px-6">
       <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-4">
-        <span>Railway reads are cached for 30 s — use Refresh for the latest.</span>
+        <span>Pages keep what they read from Railway until you press Refresh (at most an hour).</span>
         <span>Costs are estimates (usage × Railway list prices); your invoice is authoritative.</span>
         <a href="/roadmap.html" className="link">Roadmap and feature ideas</a>
         {budgets.map((b) => (
@@ -87,7 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 </span>
               )}
               <WriteModeToggle envLocked={isEnvReadOnly()} />
-              <RefreshButton />
+              <RefreshButton dataSince={oldestCachedAt() ?? Date.now()} />
             </div>
           </div>
         </header>
@@ -96,6 +97,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <Footer />
+        <Preloader />
       </body>
     </html>
   );
