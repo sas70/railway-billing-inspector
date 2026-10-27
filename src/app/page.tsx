@@ -30,6 +30,7 @@ import { isProtectedProject, unmatchedProtectedEntries } from "@/lib/config";
 import { isReadOnly } from "@/lib/write-mode";
 import { dateNoYear, money, plural, relative } from "@/lib/format";
 import { emptyHealthCounts, needsAttention } from "@/lib/health";
+import { isGeneratedRailwayName, projectNameHints } from "@/lib/project-name";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
 import { blurbText, type RepoBlurb } from "@/lib/repo-blurb";
 import { billStructure, cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
@@ -68,6 +69,9 @@ export default async function OverviewPage() {
   }
   const candidates = cleanupCandidates(bundles);
   const workspaceCount = bundles.length;
+  const randomNames = allProjects
+    .filter((p) => !p.deletedAt && !isProtectedProject(p) && isGeneratedRailwayName(p.name, projectNameHints(p)))
+    .map((p) => p.name);
 
   if (workspaceCount === 0) {
     return (
@@ -94,7 +98,16 @@ export default async function OverviewPage() {
       <PageTitle
         title="Overview"
         subtitle={`Your infrastructure, at a glance. Costs and service health across ${plural(workspaceCount, "workspace")}. Search every workspace. Each project lists its public *.up.railway.app URL and a direct Railway dashboard link.`}
-        actions={<Link href="/services" className={buttonClass("neutral", "md")}>Explore services <Icon name="chevron" size={14} /></Link>}
+        actions={
+          <>
+            <Link href="/rename" className={buttonClass("ghost", "md")}>
+              <Icon name="pencil" size={13} /> Rename projects
+            </Link>
+            <Link href="/services" className={buttonClass("neutral", "md")}>
+              Explore services <Icon name="chevron" size={14} />
+            </Link>
+          </>
+        }
       />
       <OverviewSearch totalProjects={projectCount} />
 
@@ -147,6 +160,16 @@ export default async function OverviewPage() {
 
       {candidates.length > 0 && <WorthALook candidates={candidates} structure={billStructure(bundles)} renderedAt={Date.now()} />}
 
+      {randomNames.length > 0 && (
+        <Notice tone="info" title={`${plural(randomNames.length, "project")} still ${randomNames.length === 1 ? "has" : "have"} the random name Railway picked`}>
+          {listNames(randomNames)} {randomNames.length === 1 ? "doesn't" : "don't"} say what {randomNames.length === 1 ? "it runs" : "they run"}.{" "}
+          <Link href="/rename" className="link">
+            Rename {randomNames.length === 1 ? "it" : "them"} in one review
+          </Link>
+          , with names suggested from each project&apos;s code summary or repo.
+        </Notice>
+      )}
+
       {bundles.map((bundle) => (
         <WorkspaceSection
           key={`${bundle.account.key}-${bundle.workspace.id}`}
@@ -158,6 +181,14 @@ export default async function OverviewPage() {
       ))}
     </div>
   );
+}
+
+/** “a”, “a and b”, “a, b, c and 2 more” */
+function listNames(names: string[], max = 3): string {
+  const shown = names.slice(0, max);
+  const rest = names.length - shown.length;
+  if (rest > 0) return `${shown.join(", ")} and ${rest} more`;
+  return shown.length > 1 ? `${shown.slice(0, -1).join(", ")} and ${shown[shown.length - 1]}` : shown.join("");
 }
 
 function WorkspaceSection({
@@ -314,6 +345,7 @@ function WorkspaceSection({
                         accountKey={bundle.account.key}
                         projectId={project.id}
                         currentName={project.name}
+                        generated={isGeneratedRailwayName(project.name, projectNameHints(project))}
                         readOnly={readOnly}
                         lockedReason={
                           isProtectedProject(project)

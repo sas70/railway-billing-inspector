@@ -267,6 +267,7 @@
     { icon: "search", title: "Search and AI summaries", text: "Find an app by what it does. Claude summarizes each repo's code once and only re-runs when the code changes." },
     { icon: "pointer", title: "Hover summaries", isNew: true, text: "Hover any project or service name to see what its code does, without leaving the list." },
     { icon: "text", title: "Railway descriptions", isNew: true, text: "Copy each app's saved summary into its Railway project description, after one review." },
+    { icon: "pencil", title: "Rename projects", isNew: true, text: "Swap Railway's random names like steadfast-fascination for names that say what each app does, several at once, with suggestions from each app's code summary." },
     { icon: "shield", title: "Safe changes", text: "Every change is reviewed, approved, re-checked right before it runs and logged. Read-only until you turn on Write mode." },
     { icon: "laptop", title: "Runs on your machine", text: "Local-only by default and tokens never reach the browser. The demo runs on fake data and needs no token." },
   ];
@@ -279,18 +280,7 @@
 
   const ROADMAP = [
     {
-      id: "bulk-rename", stage: "now", title: "Bulk rename table",
-      summary: "Replace Railway's generated names like steadfast-fascination with names that say what each app does.",
-      details: [
-        "One row per project: current name, suggested name and a checkbox",
-        "Suggestions come from each app's saved summary, as slugs like room-shell-matcher, and can be edited",
-        "Railway's generated names are ticked for you",
-        "Rename selected: one review of every old → new name, then one confirm",
-        "Each rename goes in the audit log; domains, services and billing stay the same",
-      ],
-    },
-    {
-      id: "assistant-guide", stage: "next", title: "AI assistant: guide",
+      id: "assistant-guide", stage: "now", title: "AI assistant: guide",
       summary: "Ask in plain words, like “which apps cost the most?” or “I want to summarize my apps”, and get an answer or a link to the page that does it.",
       details: ["Answers from your dashboard's data: projects, costs, status and summaries", "Points you to the right page", "Read-only: it can't change anything"],
     },
@@ -338,6 +328,7 @@
     shield: '<path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="m9 12 2 2 4-4"/>',
     laptop: '<rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/>',
     clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    pencil: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   };
 
   function icon(name) {

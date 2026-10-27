@@ -241,6 +241,30 @@ export async function loadWorkspaceProjects(account: AccountConfig, workspaceId:
   return out.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+export type WorkspaceProject = { account: AccountConfig; workspace: WorkspaceRef; project: ProjectSummary };
+
+/**
+ * Every project the tokens can see, each workspace once. A token or workspace that can't be read
+ * is described in `notes` instead of failing the whole read.
+ */
+export async function loadAllProjects(views: AccountView[], opts: { fresh?: boolean } = {}): Promise<{ projects: WorkspaceProject[]; notes: string[] }> {
+  const notes: string[] = [];
+  for (const view of views) {
+    if (view.error) notes.push(`Token “${view.label}” isn't working, so its projects aren't included: ${view.error}`);
+  }
+  const lists = await Promise.all(
+    uniqueWorkspaceTargets(views).map(async ({ account, workspace }) => {
+      try {
+        return (await loadWorkspaceProjects(account, workspace.id, opts)).map((project) => ({ account, workspace, project }));
+      } catch (error) {
+        notes.push(`Couldn't read the projects in ${workspace.name}, so none of them are included: ${friendlyError(error)}`);
+        return [];
+      }
+    }),
+  );
+  return { projects: lists.flat(), notes };
+}
+
 // ── Billing ─────────────────────────────────────────────────────────────────
 
 export type BillingView = {

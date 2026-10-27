@@ -11,7 +11,7 @@ import { plural } from "./format";
 import type { ExecutionItemResult, PlanFlag } from "./plan-types";
 import { UserFacingError } from "./plans";
 import { DESCRIPTION_MAX, descriptionFromSummaries, normalizeDescription, sameDescription } from "./project-description";
-import { friendlyError, loadAccountViews, loadProject, loadWorkspaceProjects, uniqueWorkspaceTargets, type ProjectSummary } from "./railway/api";
+import { friendlyError, loadAccountViews, loadAllProjects, loadProject, loadWorkspaceProjects, type ProjectSummary } from "./railway/api";
 import { clearCache, railwayRequest } from "./railway/client";
 import * as D from "./railway/documents";
 import { RailwayApiError } from "./railway/errors";
@@ -70,23 +70,11 @@ async function loadCandidates(scope: DescribeScope | null): Promise<{ candidates
     if (!project) throw new UserFacingError("Project not found.");
     return { candidates: [{ account, workspaceId: workspace.id, workspaceName: workspace.name, project }], notes: [] };
   }
-  const notes: string[] = [];
-  const views = await loadAccountViews();
-  for (const view of views) {
-    if (view.error) notes.push(`Token “${view.label}” isn't working, so its projects aren't included: ${view.error}`);
-  }
-  const lists = await Promise.all(
-    uniqueWorkspaceTargets(views).map(async ({ account, workspace }) => {
-      try {
-        const projects = await loadWorkspaceProjects(account, workspace.id, { fresh: true });
-        return projects.map((project) => ({ account, workspaceId: workspace.id, workspaceName: workspace.name, project }));
-      } catch (error) {
-        notes.push(`Couldn't read the projects in ${workspace.name}, so none of them are included: ${friendlyError(error)}`);
-        return [];
-      }
-    }),
-  );
-  return { candidates: lists.flat(), notes };
+  const { projects, notes } = await loadAllProjects(await loadAccountViews(), { fresh: true });
+  return {
+    candidates: projects.map(({ account, workspace, project }) => ({ account, workspaceId: workspace.id, workspaceName: workspace.name, project })),
+    notes,
+  };
 }
 
 function draftItem(c: Candidate, summaries: Map<string, StoredSummary>): DescribePlanItem {

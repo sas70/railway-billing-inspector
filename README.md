@@ -14,7 +14,7 @@ With it I took every project offline in one click, then turned back on only the 
 
 ![Services page after cleanup: 94 services, 1 online, 93 offline](docs/dashboard-after-cleanup.jpg)
 
-- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. Pick **Today / This week / This month / This year / All** to see only recent crashes and failed deploys (This week by default, remembered per browser). Below them, **Still on this period's bill** lists PR environments still running and projects with nothing running that have charges this billing period, whatever the date filter. Each one says whether it is **still charging** (Railway charged it in the last 2 full days with nothing running, usually an attached volume; with the cost per day) or was **charged earlier and stopped** (it drops off when the period ends), with a link to daily cost by project. Above that list, a summary shows what projects with nothing running cost per day (and roughly by period end), this period's cost by status, and what those projects are charged for (CPU, memory, egress or volume storage), so you can see why before opening each one. Search covers every workspace and account (name, domain, service, project ID). Under each project name: the public `*.up.railway.app` (or custom) domain, then a red **Open in Railway** link to `https://railway.com/project/<id>` so you can jump straight into Railway's dashboard. **Rename** sits under that — two-word Railway slugs like `steadfast-fascination` are marked **generated name**. Enable Write mode, type a clearer name, then review and approve. **Hover over a project name** to see what its code does: the saved Claude summary when there is one, otherwise the README of your local clone. These cards read local files only, so a repo that is only on GitHub shows one once it has been summarized.
+- **Overview.** Every workspace and project with live, crashed, failed and sleeping counts, cost this period, projected cost, and a "Worth a look" list: crashed services, failed deploys, forgotten PR environments, and projects with nothing live that still cost money. Pick **Today / This week / This month / This year / All** to see only recent crashes and failed deploys (This week by default, remembered per browser). Below them, **Still on this period's bill** lists PR environments still running and projects with nothing running that have charges this billing period, whatever the date filter. Each one says whether it is **still charging** (Railway charged it in the last 2 full days with nothing running, usually an attached volume; with the cost per day) or was **charged earlier and stopped** (it drops off when the period ends), with a link to daily cost by project. Above that list, a summary shows what projects with nothing running cost per day (and roughly by period end), this period's cost by status, and what those projects are charged for (CPU, memory, egress or volume storage), so you can see why before opening each one. Search covers every workspace and account (name, domain, service, project ID). Under each project name: the public `*.up.railway.app` (or custom) domain, then a red **Open in Railway** link to `https://railway.com/project/<id>` so you can jump straight into Railway's dashboard. **Rename** sits under that. Names that look like the random two-word ones Railway picks, such as `steadfast-fascination`, are marked **generated name**; enable Write mode, type a clearer name, then review and approve. To rename several at once, open **Rename projects** (see [below](#rename-several-projects-at-once)). **Hover over a project name** to see what its code does: the saved Claude summary when there is one, otherwise the README of your local clone. These cards read local files only, so a repo that is only on GitHub shows one once it has been summarized.
 - **Search.** Find a project by what it does, not the name Railway generated. **Search → Project catalog** lists every project with a one-line summary pulled from its repo's README. Type a query to search project details, READMEs and the code itself, with options for regex, match case, path filter, workspace and status. Code is read **read-only** from your local clones (`CODE_LOCAL_ROOTS`, matched by each clone's GitHub remote) or from GitHub (`GITHUB_TOKEN`, or your `gh` CLI login when running locally). Nothing is cloned, pulled or changed. Each project page also gets an **About this app** card. With `ANTHROPIC_API_KEY` set, **Summarize with Claude** reads each repo's code (file tree, README, manifests, entry points) and writes a short summary. Each summary is saved inside that clone at `.railway-inspector/summary.json`, git-ignored through `.git/info/exclude`; repos that exist only on GitHub are saved under `data/code-summaries/`. Every summary is stamped with its commit and is regenerated automatically only when the code changes. **Copy to Railway descriptions** then writes each summary into its project's Railway description, so it shows up in Railway's own dashboard and anywhere else the project is listed (see [below](#copy-summaries-into-railway-descriptions)).
 - **Services.** Every service across every workspace. Default sort is **newest deploy first**. Click a column (service, status, environment, latest deploy, this period, expected) to sort. Search and All / Online / Offline still apply. Each row has a red **Open in Railway** icon next to the service name that opens that service in Railway (`/project/…/service/…`). Hover over a service name to see what its repo does.
 - **Project.** Cost by service and by resource, a service table for each environment, volumes, a red **Open in Railway** link, and a danger zone.
@@ -73,7 +73,19 @@ The "Worth a look" suggestions only link to the right page. Nothing in the app a
 
 ### Rename a project
 
-On **Overview**, under the project name, click **Rename**. Railway-assigned names (`adjective-noun`) show a **generated name** badge. Type the name you want (1–64 characters), click **Review**, then confirm. That calls Railway `projectUpdate`. It does not change services, domains, or cost. Protected projects and read-only mode stay locked. You can rename again later.
+On **Overview**, under the project name, click **Rename**. Type the name you want (1–64 characters), click **Review**, then confirm. That calls Railway `projectUpdate`. It does not change services, domains, or cost; Railway's own `RAILWAY_PROJECT_NAME` variable takes the new name at each service's next deploy, in case your code or logs use it. Protected projects and read-only mode stay locked. You can rename again later.
+
+Names that look like the random ones Railway picks show a **generated name** badge: two lowercase words, neither of which appears in the project's repo or service names or is a word people name projects with (`api`, `site`, `old`, …). It's a guess, so it only decides the badge and which rows the rename table ticks.
+
+### Rename several projects at once
+
+**Rename projects** (top of the Overview) lists every project in one table.
+
+- Names that look like Railway's random ones are ticked, each with a suggested name: a slug of the app name in its saved Claude summary (for example `acme-status-page`), or of its repo name when there's no summary yet. Projects you named yourself start unticked, and only get a suggestion from a summary.
+- Edit any name and tick or untick rows (typing a name ticks its row), then click **Review**. The server re-reads every project from Railway and lists old → new for each. Nothing changes until you confirm.
+- Names follow the same rules as a single rename. A name that another project in the same workspace has, or is also getting, is flagged but allowed.
+- Each project is re-read right before it's renamed; if it was renamed somewhere else after your review, it's skipped. Protected projects and projects outside a token's workspace limit are locked, and read-only mode blocks the review.
+- Each rename is logged with both names. One review covers up to 100 projects. As with a single rename, only the name changes (and `RAILWAY_PROJECT_NAME` on each service's next deploy).
 
 ### Copy summaries into Railway descriptions
 
@@ -96,6 +108,7 @@ Once **Summarize with Claude** has run, enable Write mode and click **Copy to Ra
 | **Delete service** (from one environment) | `serviceDelete(id, environmentId)` | Stops its charges in that environment. Volume data should be treated as gone. | Not reversible |
 | **Delete environment** (not the primary one) | `environmentDelete` | Stops everything in it. Good for forgotten PR environments. | Not reversible |
 | **Rename project** (Overview) | `projectUpdate` | none | Rename it again |
+| **Rename projects** (several at once) | `projectUpdate` (name only), one per project | none | Rename them again; the previous names are in the audit log |
 | **Copy summaries into descriptions** (Search, project page) | `projectUpdate` (description only) | none | Edit or clear it in Railway; the previous text is in the audit log |
 | **Delete project** | `projectScheduleDelete` | Railway deletes the project after a **48-hour grace period** | Cancel within 48 h (Audit log page or Railway), which calls `projectScheduleDeleteCancel` |
 
@@ -153,7 +166,7 @@ These use a 30-day month (43,200 minutes). Other inputs:
 
 ## Keeping in sync with Railway's API
 
-Run `npm test` for all unit tests: `test:cost-history` (date windows, project and resource deltas, missing data, deleted projects, zero baselines), `test:descriptions` (how summaries become Railway descriptions: joining, de-duplicating, trimming) and `test:worth-a-look` (the Overview's time filter).
+Run `npm test` for all unit tests: `test:cost-history` (date windows, project and resource deltas, missing data, deleted projects, zero baselines), `test:descriptions` (how summaries become Railway descriptions: joining, de-duplicating, trimming), `test:worth-a-look` (the Overview's time filter) and `test:names` (rename suggestions: slugs, spotting Railway's random names, keeping suggestions unique).
 
 ```bash
 npm run check:queries
@@ -169,6 +182,7 @@ This validates every GraphQL operation the dashboard sends (26 of them) against 
 src/
   app/
     page.tsx                         Overview (search, Railway links, project rename)
+    rename/page.tsx                  Rename several projects at once
     services/page.tsx                Services catalog (sortable, Railway links)
     billing/page.tsx                 Billing (current / previous period)
     a/[account]/p/[project]/page.tsx Project drill-down
@@ -178,9 +192,11 @@ src/
   lib/
     plans.ts                         Approval engine (review, gating, phrase, expiry, re-check, audit)
     describe.ts                      Same review → approve → re-check → audit path for copying summaries into descriptions
+    rename.ts                        The same path for renaming several projects at once, plus the rename table's rows
     project-description.ts           Builds and trims description text from saved summaries (tested by test:descriptions)
+    name-suggest.ts                  Rename suggestions: slugs from summary or repo names, kept unique (tested by test:names)
     code/blurbs.ts                   Hover-card text per repo, from local files only (saved summary, else a local clone's README)
-    project-name.ts                  Detects Railway-generated adjective-noun project names
+    project-name.ts                  Spots names that look like Railway's random adjective-noun ones
     railway-links.ts                 railway.com project and service dashboard URLs
     railway/documents.ts             Every GraphQL query/mutation (validated by check:queries; includes projectUpdate)
     railway/client.ts                Transport: auth, 30 s cache, concurrency, retries, errors
@@ -188,7 +204,7 @@ src/
     railway/mock.ts                  Demo-mode fake Railway
     billing.ts                       Unit prices, cost math, plan terms, periods
     audit.ts, config.ts, health.ts, format.ts
-  components/                        UI (review dialogs, ProjectRename, HoverLink, OverviewSearch, RailwayLink, ServicesTable, charts, …)
+  components/                        UI (review dialogs, ProjectRename, RenameTable, HoverLink, OverviewSearch, RailwayLink, ServicesTable, charts, …)
   proxy.ts                           Optional password gate
 scripts/check-queries.mjs            Live schema validation
 ```

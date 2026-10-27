@@ -329,7 +329,7 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
 
         <footer className="flex flex-wrap items-center justify-end gap-2 border-t border-line px-5 py-3">
           {phase.name === "done" ? (
-            <button type="button" className={buttonClass("primary", "md")} onClick={() => dialogRef.current?.close()} autoFocus>
+            <button key="close" type="button" className={buttonClass("primary", "md")} onClick={() => dialogRef.current?.close()} autoFocus>
               Close
             </button>
           ) : (
