@@ -5,6 +5,8 @@ import { ServicesBoard } from "@/components/ServicesBoard";
 import { ServicesTable } from "@/components/ServicesTable";
 import { SetupGuide } from "@/components/SetupGuide";
 import { Notice, PageTitle } from "@/components/ui";
+import { repoBlurbs } from "@/lib/code/blurbs";
+import { repoKey } from "@/lib/code/sources";
 import { isEnvReadOnly } from "@/lib/config";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
 import { serviceCatalog } from "@/lib/summaries";
@@ -21,6 +23,9 @@ export default async function ServicesPage() {
     uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace)),
   );
   const rows = serviceCatalog(bundles);
+  // Hover cards: saved summaries / local READMEs only, so this adds no Railway or GitHub calls.
+  const blurbs = await repoBlurbs(rows.flatMap((r) => (r.repo ? [r.repo] : [])));
+  const tableRows = rows.map((r) => ({ ...r, blurb: r.repo ? (blurbs.get(repoKey(r.repo)) ?? null) : null }));
   const usageMissing = bundles.some((b) => !b.usage.ok);
   const readOnly = await isReadOnly();
   const envLocked = isEnvReadOnly();
@@ -63,7 +68,7 @@ export default async function ServicesPage() {
       )}
 
       <ServicesBoard rows={rows} readOnly={readOnly}>
-        <ServicesTable rows={rows} readOnly={readOnly} />
+        <ServicesTable rows={tableRows} readOnly={readOnly} />
       </ServicesBoard>
     </div>
   );

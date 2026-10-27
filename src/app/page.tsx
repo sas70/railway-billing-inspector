@@ -2,12 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { BlurbCard } from "@/components/BlurbCard";
+import { HoverLink } from "@/components/HoverLink";
 import { Icon } from "@/components/Icon";
 import { OverviewSearch } from "@/components/OverviewSearch";
 import { ProjectLinks } from "@/components/ProjectLinks";
 import { ProjectRename } from "@/components/ProjectRename";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
+import { WorthALook } from "@/components/WorthALook";
 import {
   Badge,
   Card,
@@ -21,12 +24,15 @@ import {
   PlanBadge,
   StatTile,
 } from "@/components/ui";
+import { repoBlurbs } from "@/lib/code/blurbs";
+import { repoKey } from "@/lib/code/sources";
 import { isProtectedProject, unmatchedProtectedEntries } from "@/lib/config";
 import { isReadOnly } from "@/lib/write-mode";
 import { dateNoYear, money, plural, relative } from "@/lib/format";
 import { emptyHealthCounts, needsAttention } from "@/lib/health";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
-import { cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
+import { blurbText, type RepoBlurb } from "@/lib/repo-blurb";
+import { billStructure, cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -37,10 +43,12 @@ export default async function OverviewPage() {
   if (accounts.length === 0) return <SetupGuide />;
 
   const bundles: WorkspaceBundle[] = await Promise.all(
-    uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace)),
+    uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace, { recent: true })),
   );
   const allProjects = bundles.flatMap((b) => (b.projects.ok ? b.projects.value : []));
   const unmatchedProtected = bundles.every((b) => b.projects.ok) ? unmatchedProtectedEntries(allProjects) : [];
+  // Hover cards: saved summaries / local READMEs only, so this adds no Railway or GitHub calls.
+  const blurbs = await repoBlurbs(allProjects.flatMap((p) => p.repos));
 
   const totals = emptyHealthCounts();
   let projectCount = 0;
@@ -137,35 +145,7 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      {candidates.length > 0 && (
-        <Card className="overflow-hidden">
-          <CardHeader
-            title={<span className="flex items-center gap-2">Worth a look <Badge>{candidates.length}</Badge></span>}
-            subtitle="A few things to review. Every change still needs your approval."
-          />
-          <ul className="recommendations grid md:grid-cols-2">
-            {candidates.slice(0, 10).map((c) => (
-              <li key={c.key}>
-                <Link href={c.href} className="flex h-full items-start gap-3 px-5 py-4 transition-colors hover:bg-surface-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: c.severity === 0 ? "var(--danger-wash)" : c.severity === 1 ? "var(--warning-wash)" : "var(--info-wash)" }}>
-                    <Icon
-                      name={c.icon}
-                      size={15}
-                      color={c.severity === 0 ? "var(--status-critical)" : c.severity === 1 ? "var(--status-warning)" : "var(--series-1)"}
-                    />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">{c.title}</span>
-                    <span className="mt-1 block text-xs leading-relaxed text-ink-2">{c.detail}</span>
-                  </span>
-                  <Icon name="chevron" size={14} className="mt-1 shrink-0 text-ink-2" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {candidates.length > 10 && <p className="border-t border-line px-4 py-2 text-xs text-ink-2">…and {candidates.length - 10} more.</p>}
-        </Card>
-      )}
+      {candidates.length > 0 && <WorthALook candidates={candidates} structure={billStructure(bundles)} renderedAt={Date.now()} />}
 
       {bundles.map((bundle) => (
         <WorkspaceSection
@@ -173,6 +153,7 @@ export default async function OverviewPage() {
           bundle={bundle}
           showAccount={accounts.length > 1}
           readOnly={readOnly}
+          blurbs={blurbs}
         />
       ))}
     </div>
@@ -183,10 +164,12 @@ function WorkspaceSection({
   bundle,
   showAccount,
   readOnly,
+  blurbs,
 }: {
   bundle: WorkspaceBundle;
   showAccount: boolean;
   readOnly: boolean;
+  blurbs: Map<string, RepoBlurb>;
 }) {
   const figures = workspaceFigures(bundle);
   const billing = bundle.billing.ok ? bundle.billing.value : null;
@@ -293,6 +276,8 @@ function WorkspaceSection({
                 ]
                   .join(" ")
                   .toLowerCase();
+                const projectBlurbs = project.repos.flatMap((r) => blurbs.get(repoKey(r)) ?? []);
+                const nameClass = "font-medium hover:underline underline-offset-2";
                 return (
                   <tr
                     key={project.id}
@@ -302,9 +287,20 @@ function WorkspaceSection({
                   >
                     <td className="px-4 py-2.5">
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <Link href={href} className="font-medium hover:underline underline-offset-2">
-                          {project.name}
-                        </Link>
+                        {projectBlurbs.length > 0 || project.description ? (
+                          <HoverLink
+                            href={href}
+                            className={nameClass}
+                            card={<BlurbCard blurbs={projectBlurbs} description={project.description} />}
+                            description={blurbText(projectBlurbs, project.description)}
+                          >
+                            {project.name}
+                          </HoverLink>
+                        ) : (
+                          <Link href={href} className={nameClass}>
+                            {project.name}
+                          </Link>
+                        )}
                         {isProtectedProject(project) && (
                           <Badge title="Listed in PROTECTED_PROJECTS">
                             <Icon name="lock" size={10} /> protected

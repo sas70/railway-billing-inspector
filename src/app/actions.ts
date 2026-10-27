@@ -6,6 +6,8 @@ import { getAccount, isEnvReadOnly, workspaceAllowed, WRITE_MODE_COOKIE } from "
 import { isReadOnly } from "@/lib/write-mode";
 import { createBulkPlan, executeBulkPlan } from "@/lib/bulk";
 import type { BulkExecutionView, BulkPlanView } from "@/lib/bulk-types";
+import { createDescribePlan, executeDescribePlan } from "@/lib/describe";
+import type { DescribeExecutionView, DescribePlanView } from "@/lib/describe-types";
 import type { ActionResult, ExecutionView, PlanView } from "@/lib/plan-types";
 import { createPlan, executePlan, UserFacingError } from "@/lib/plans";
 import { friendlyError, loadDeployment, loadLogs, loadProject } from "@/lib/railway/api";
@@ -43,6 +45,23 @@ export async function createBulkPlanAction(request: unknown): Promise<ActionResu
 export async function executeBulkPlanAction(planId: unknown, phrase: unknown): Promise<ActionResult<BulkExecutionView>> {
   try {
     return { ok: true, data: await executeBulkPlan(planId, phrase) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** Review copying saved summaries into Railway project descriptions (one project, or all). Changes nothing. */
+export async function createDescribePlanAction(scope: unknown): Promise<ActionResult<DescribePlanView>> {
+  try {
+    return { ok: true, data: await createDescribePlan(scope) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+export async function executeDescribePlanAction(planId: unknown): Promise<ActionResult<DescribeExecutionView>> {
+  try {
+    return { ok: true, data: await executeDescribePlan(planId) };
   } catch (error) {
     return { ok: false, error: toMessage(error) };
   }

@@ -35,6 +35,7 @@ function Footer() {
       <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-4">
         <span>Railway reads are cached for 30 s — use Refresh for the latest.</span>
         <span>Costs are estimates (usage × Railway list prices); your invoice is authoritative.</span>
+        <a href="/roadmap.html" className="link">Roadmap and feature ideas</a>
         {budgets.map((b) => (
           <span key={b.label} className="tabular">
             API budget · {b.label}: {b.rate!.remaining}

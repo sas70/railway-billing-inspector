@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { ActionButton } from "@/components/ActionReview";
+import { DescribeButton } from "@/components/DescribeSummaries";
 import { ErrorState } from "@/components/ErrorState";
 import { Icon } from "@/components/Icon";
 import { RailwayLink } from "@/components/RailwayLink";
 import { repoInfos } from "@/lib/code";
-import { aiSummariesAvailable, summaryStatuses, type SummaryStatus } from "@/lib/code/ai-summary";
+import { aiSummariesAvailable, savedSummaries, summaryStatuses, type SummaryStatus } from "@/lib/code/ai-summary";
 import { repoKey } from "@/lib/code/sources";
 import { railwayProjectUrl } from "@/lib/railway-links";
 import {
@@ -26,7 +27,7 @@ import {
   PlanBadge,
   StatTile,
 } from "@/components/ui";
-import { getAccount, isProtectedProject, workspaceAllowed } from "@/lib/config";
+import { getAccount, isMockMode, isProtectedProject, workspaceAllowed } from "@/lib/config";
 import { isReadOnly } from "@/lib/write-mode";
 import { dateShort, deploymentMeta, money, plural, relative, sizeMB } from "@/lib/format";
 import {
@@ -97,7 +98,12 @@ export default async function ProjectPage({ params, searchParams }: Props) {
   const volumeUsed = envView?.volumes.reduce((sum, v) => sum + v.currentSizeMB, 0) ?? 0;
   const volumeSize = envView?.volumes.reduce((sum, v) => sum + v.sizeMB, 0) ?? 0;
   const repos = [...new Set((envView?.instances ?? []).flatMap((i) => (i.source?.repo ? [i.source.repo] : [])))].sort();
-  const [readmes, aiStatuses] = await Promise.all([repoInfos(repos), aiSummariesAvailable() ? summaryStatuses(repos) : Promise.resolve(new Map<string, SummaryStatus>())]);
+  const [readmes, aiStatuses, saved] = await Promise.all([
+    repoInfos(repos),
+    aiSummariesAvailable() || isMockMode() ? summaryStatuses(repos) : Promise.resolve(new Map<string, SummaryStatus>()),
+    // Copying to Railway only needs the saved files, not an API key.
+    savedSummaries(repos),
+  ]);
   const about = [...readmes.values()]
     .map((i) => ({ ...i, ai: aiStatuses.get(repoKey(i.repo))?.stored?.summary ?? null, stale: !!aiStatuses.get(repoKey(i.repo))?.stale }))
     .filter((i) => i.ai || i.readme || i.description);
@@ -156,7 +162,19 @@ export default async function ProjectPage({ params, searchParams }: Props) {
           <CardHeader
             title={<span className="flex items-center gap-2"><Icon name="code" size={14} /> About this app</span>}
             subtitle="From the repo it deploys from: Claude's summary of the code when available, otherwise the README."
-            actions={<Link href={`/search?repo=${encodeURIComponent(repos[0] ?? "")}`} className="link text-xs">Search its code →</Link>}
+            actions={
+              <>
+                {saved.size > 0 && (
+                  <DescribeButton
+                    scope={{ accountKey: account.key, projectId: project.id }}
+                    readOnly={readOnly}
+                    lockedReason={locked ? "This project is protected (PROTECTED_PROJECTS)" : project.deletedAt ? "Scheduled for deletion" : undefined}
+                    label="Copy to Railway description"
+                  />
+                )}
+                <Link href={`/search?repo=${encodeURIComponent(repos[0] ?? "")}`} className="link text-xs">Search its code →</Link>
+              </>
+            }
           />
           <ul className="divide-y divide-line">
             {about.map((info) => (

@@ -1,0 +1,23 @@
+name: Feature idea
+description: Suggest something Railway Billing Inspector should do
+title: "[Idea]: "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Others can vote on it with 👍 or 👎, and it shows up under "Ideas from the community" on the [roadmap page](https://railway-billing-inspector.vercel.app/roadmap.html).
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should the dashboard do?
+      description: Describe the feature in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?
+      description: The problem it solves, or the time it would save you.
+    validations:
+      required: false

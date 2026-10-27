@@ -1,5 +1,6 @@
 import "server-only";
 
+import { recentWindow } from "../worth-a-look";
 import {
   addMeasurement,
   costOf,
@@ -228,11 +229,11 @@ export function sortEnvironments<E extends { id: string; name: string; isEphemer
   });
 }
 
-export async function loadWorkspaceProjects(account: AccountConfig, workspaceId: string): Promise<ProjectSummary[]> {
+export async function loadWorkspaceProjects(account: AccountConfig, workspaceId: string, opts: { fresh?: boolean } = {}): Promise<ProjectSummary[]> {
   const out: ProjectSummary[] = [];
   let after: string | undefined;
   for (let page = 0; page < 20; page++) {
-    const { projects } = await railwayRequest<T.WorkspaceProjectsResult>(account, D.WorkspaceProjects, { workspaceId, after });
+    const { projects } = await railwayRequest<T.WorkspaceProjectsResult>(account, D.WorkspaceProjects, { workspaceId, after }, opts);
     out.push(...nodes(projects).map(summarizeProject));
     if (!projects.pageInfo.hasNextPage || !projects.pageInfo.endCursor) break;
     after = projects.pageInfo.endCursor;
@@ -449,12 +450,14 @@ export type WorkspaceBundle = {
   billing: Settled<BillingView>;
   usage: Settled<UsageView>;
   estimates: Settled<EstimateView> | null;
+  /** Cost per project over the last RECENT_DAYS complete days (only when asked for). */
+  recent: Settled<Record<string, CostBreakdown>> | null;
 };
 
 export async function loadWorkspaceBundle(
   account: AccountConfig,
   workspace: WorkspaceRef,
-  opts: { period?: "current" | "previous"; includeProjects?: boolean } = {},
+  opts: { period?: "current" | "previous"; includeProjects?: boolean; recent?: boolean } = {},
 ): Promise<WorkspaceBundle> {
   const wantPrevious = opts.period === "previous";
   const [projects, billing] = await Promise.all([
@@ -468,14 +471,21 @@ export async function loadWorkspaceBundle(
     period = wantPrevious ? previousPeriod(current, billing.value.anchor) : current;
   }
 
-  const [usage, estimates] = await Promise.all([
+  const [usage, estimates, recent] = await Promise.all([
     wantPrevious && !period
       ? Promise.resolve<Settled<UsageView>>({ ok: false, error: "The previous period needs billing access to know its dates." })
       : settle(loadWorkspaceUsage(account, workspace.id, period)),
     wantPrevious ? Promise.resolve(null) : settle(loadWorkspaceEstimates(account, workspace.id)),
+    opts.recent ? settle(loadRecentCosts(account, workspace.id)) : Promise.resolve(null),
   ]);
 
-  return { account: { key: account.key, label: account.label }, workspace, projects, billing, usage, estimates };
+  return { account: { key: account.key, label: account.label }, workspace, projects, billing, usage, estimates, recent };
+}
+
+/** What each project was charged over the last RECENT_DAYS complete UTC days. */
+export async function loadRecentCosts(account: AccountConfig, workspaceId: string): Promise<Record<string, CostBreakdown>> {
+  const usage = await loadWorkspaceUsage(account, workspaceId, recentWindow());
+  return Object.fromEntries(usage.projects.map((p) => [p.id, p.cost]));
 }
 
 // ── Project, environment, service ───────────────────────────────────────────

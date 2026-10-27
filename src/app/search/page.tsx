@@ -3,15 +3,18 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { buttonClass } from "@/components/button";
+import { DescribeButton } from "@/components/DescribeSummaries";
 import { Icon } from "@/components/Icon";
 import { SetupGuide } from "@/components/SetupGuide";
 import { SummaryControls } from "@/components/SummaryControls";
 import { Badge, Card, CardHeader, EmptyState, HealthSummary, Notice, PageTitle } from "@/components/ui";
 import { codeSetup, makeMatcher, repoInfos, searchCode, type RepoInfo, type SearchOptions } from "@/lib/code";
-import { aiSummariesAvailable, startSummaryJob, summaryJob, summaryStatuses, type SummaryJob, type SummaryStatus } from "@/lib/code/ai-summary";
+import { aiSummariesAvailable, savedSummaries, startSummaryJob, summaryJob, summaryStatuses, type SummaryJob, type SummaryStatus } from "@/lib/code/ai-summary";
 import { matchingLines } from "@/lib/code/readme";
 import { repoKey } from "@/lib/code/sources";
+import { isMockMode } from "@/lib/config";
 import { plural } from "@/lib/format";
+import { isReadOnly } from "@/lib/write-mode";
 import { isOnlineHealth, needsAttention } from "@/lib/health";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type ProjectSummary } from "@/lib/railway/api";
 
@@ -111,7 +114,17 @@ export default async function SearchPage({ searchParams }: Props) {
 
   const repos = repoFilter ? [repoFilter] : [...new Set(entries.flatMap((e) => e.project.repos))];
   const aiOn = aiSummariesAvailable();
-  const [setup, readmes, statuses] = await Promise.all([codeSetup(), repoInfos(repos, fresh), aiOn ? summaryStatuses(repos) : Promise.resolve(new Map<string, SummaryStatus>())]);
+  // Demo mode has built-in stand-in summaries (no Claude calls), so show them too.
+  const showSummaries = aiOn || isMockMode();
+  const [setup, readmes, statuses, readOnly, saved] = await Promise.all([
+    codeSetup(),
+    repoInfos(repos, fresh),
+    showSummaries ? summaryStatuses(repos) : Promise.resolve(new Map<string, SummaryStatus>()),
+    isReadOnly(),
+    // Copying to Railway only needs the saved files, not an API key.
+    savedSummaries(repos),
+  ]);
+  const summarized = saved.size;
   const infos = new Map<string, Info>([...readmes].map(([k, i]) => [k, { ...i, ai: statuses.get(k) }]));
   // Code changed since a saved summary → refresh just those in the background.
   const stale = repos.filter((r) => statuses.get(repoKey(r))?.stale);
@@ -283,6 +296,8 @@ export default async function SearchPage({ searchParams }: Props) {
           infoOf={infoOf}
           refreshHref={qs({ fresh: "1" })}
           ai={aiOn ? { job, missing: missingAi, total: repos.length } : null}
+          describe={summarized > 0 ? { readOnly } : null}
+          demo={isMockMode()}
         />
       ) : (
         <>
@@ -529,11 +544,16 @@ function Catalog({
   infoOf,
   refreshHref,
   ai,
+  describe,
+  demo,
 }: {
   entries: Entry[];
   infoOf: (r: string) => Info | undefined;
   refreshHref: string;
   ai: { job: SummaryJob; missing: number; total: number } | null;
+  /** Shown once at least one repo has a saved summary. */
+  describe: { readOnly: boolean } | null;
+  demo: boolean;
 }) {
   return (
     <Card className="overflow-hidden">
@@ -542,11 +562,14 @@ function Catalog({
         subtitle={
           ai
             ? "What each project does, summarized by Claude from its code (saved in each repo, re-run only when the code changes). README summary until then."
-            : "Every project with a one-line summary from its README. Add ANTHROPIC_API_KEY to .env.local for AI summaries from the code itself."
+            : demo
+              ? "What each project does. The demo shows sample summaries; run it locally with ANTHROPIC_API_KEY to summarize your own code."
+              : "Every project with a one-line summary from its README. Add ANTHROPIC_API_KEY to .env.local for AI summaries from the code itself."
         }
         actions={
           <>
           {ai && <SummaryControls job={ai.job} missing={ai.missing} total={ai.total} />}
+          {describe && !ai?.job.running && <DescribeButton readOnly={describe.readOnly} label="Copy to Railway descriptions" />}
           <Link href={refreshHref} className={buttonClass("ghost")} prefetch={false}>
             <Icon name="refresh" size={12} /> Re-read READMEs
           </Link>

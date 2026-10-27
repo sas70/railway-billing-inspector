@@ -145,3 +145,65 @@ end
     },
   },
 };
+
+export type MockSummary = {
+  name: string;
+  summary: string;
+  stack: string[];
+  features: string[];
+  services: string[];
+  entrypoint: string;
+  keywords: string[];
+};
+
+/**
+ * Demo stand-ins for "Summarize with Claude" results. acme/relay and studio/legacy-dash are
+ * left out on purpose, so the demo also shows the README fallback and "no summary yet".
+ */
+export const MOCK_SUMMARIES: Record<string, MockSummary> = {
+  "acme/api": {
+    name: "Acme storefront API",
+    summary: "Express API that serves the Acme product catalog, carts and Stripe checkout, with a worker that emails order confirmations through Postmark.",
+    stack: ["TypeScript", "Node.js", "Express"],
+    features: ["Product catalog and carts", "Stripe Checkout sessions", "Order confirmation emails"],
+    services: ["Stripe", "Postmark"],
+    entrypoint: "node dist/server.js",
+    keywords: ["checkout", "stripe", "orders", "email"],
+  },
+  "acme/site": {
+    name: "Acme marketing site",
+    summary: "Next.js marketing site for acme.dev with static pricing, blog and docs pages; the contact form posts to the Acme API.",
+    stack: ["TypeScript", "Next.js"],
+    features: ["Static pricing, blog and docs pages", "Contact form"],
+    services: ["Acme API"],
+    entrypoint: "next start",
+    keywords: ["website", "marketing", "contact form"],
+  },
+  "studio/portal-web": {
+    name: "Client portal front end",
+    summary: "React front end where studio clients review invoices, approve designs and upload brand assets.",
+    stack: ["TypeScript", "React"],
+    features: ["Invoice list", "Design approvals", "Brand asset uploads"],
+    services: ["portal-api"],
+    entrypoint: "npm start",
+    keywords: ["portal", "invoices", "clients"],
+  },
+  "studio/portal-api": {
+    name: "Client portal API",
+    summary: "GraphQL API behind the client portal: invoices and uploads in Postgres via Prisma, files on S3, sign-in with Clerk.",
+    stack: ["TypeScript", "GraphQL", "Prisma"],
+    features: ["Invoices API", "File uploads to S3", "Clerk authentication"],
+    services: ["Postgres", "S3", "Clerk"],
+    entrypoint: "node dist/index.js",
+    keywords: ["graphql", "invoices", "uploads"],
+  },
+  "studio/pipeline": {
+    name: "Analytics pipeline",
+    summary: "Python worker that loads client-site analytics events into Postgres and builds the nightly PDF report emailed to each client.",
+    stack: ["Python", "Postgres", "WeasyPrint"],
+    features: ["Event ingestion", "Nightly PDF reports"],
+    services: ["Postgres"],
+    entrypoint: "python ingest/worker.py",
+    keywords: ["analytics", "reports", "pdf"],
+  },
+};

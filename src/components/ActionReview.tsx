@@ -22,7 +22,7 @@ type Phase =
   | { name: "running"; plan: PlanView }
   | { name: "done"; plan: PlanView; result: ExecutionView };
 
-const FLAG_STYLE: Record<PlanFlag["tone"], { icon: IconName; color: string; bg: string }> = {
+export const FLAG_STYLE: Record<PlanFlag["tone"], { icon: IconName; color: string; bg: string }> = {
   danger: { icon: "alert", color: "var(--status-critical)", bg: "bg-[var(--danger-wash)]" },
   warning: { icon: "alert", color: "var(--status-warning)", bg: "bg-[var(--warning-wash)]" },
   info: { icon: "info", color: "var(--series-1)", bg: "bg-[var(--info-wash)]" },
@@ -257,7 +257,9 @@ export function ReviewDialog({ request, onClose }: { request: PlanRequest; onClo
   );
 }
 
-function Results({ result }: { result: ExecutionView }) {
+type ResultSummary = Pick<ExecutionView, "results" | "succeeded" | "failed" | "skipped" | "unknown" | "auditWritten" | "auditError">;
+
+export function Results({ result }: { result: ResultSummary }) {
   const icon: Record<string, { name: IconName; color: string; label: string }> = {
     success: { name: "check", color: "var(--status-good)", label: "Done" },
     failed: { name: "x", color: "var(--status-critical)", label: "Failed" },
@@ -300,7 +302,7 @@ function Results({ result }: { result: ExecutionView }) {
   );
 }
 
-function Callout({ tone, title, children }: { tone: "danger" | "warning" | "info"; title?: string; children: React.ReactNode }) {
+export function Callout({ tone, title, children }: { tone: "danger" | "warning" | "info"; title?: string; children: React.ReactNode }) {
   const s = FLAG_STYLE[tone];
   return (
     <div role={tone === "danger" ? "alert" : "note"} className={`flex gap-2 rounded-lg border border-line px-3 py-2 ${s.bg}`}>

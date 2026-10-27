@@ -6,6 +6,9 @@ import path from "node:path";
 import { isMockMode } from "./config";
 import type { PlanKind } from "./plan-types";
 
+/** Plan kinds, plus changes made by the description review (describe.ts). */
+export type AuditKind = PlanKind | "project.describe";
+
 /**
  * Append-only audit trail of every approved action, one JSON object per line.
  * Stored locally in ./data (or AUDIT_LOG_DIR). Demo mode writes to a separate file.
@@ -13,7 +16,7 @@ import type { PlanKind } from "./plan-types";
 export type AuditEvent = {
   ts: string;
   planId: string;
-  kind: PlanKind;
+  kind: AuditKind;
   /**
    * "started" is written right before a change is sent, then the outcome is appended.
    * A "started" line without an outcome means the process stopped mid-way.

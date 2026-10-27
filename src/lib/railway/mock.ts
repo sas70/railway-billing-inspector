@@ -79,6 +79,8 @@ type MInstance = {
   rates: Rates;
   ratesSince: number;
   accrued: Accrued;
+  /** When the `accrued` usage happened (so a short window early or late in the period gets the right share). */
+  accruedSpan: [number, number] | null;
   deleted: boolean;
 };
 
@@ -210,6 +212,13 @@ const SPEC: ProjSpec[] = [
     name: "socket-relay",
     ageDays: 120,
     envs: [{ name: "production", services: [{ name: "relay", repo: "acme/relay", history: ["SLEEPING", "REMOVED"], sleep: true, rates: { cpu: 0.0003, mem: 0.004 } }] }],
+  },
+  {
+    // Ran for part of this period, then taken offline: charged earlier, nothing new since.
+    ws: "personal",
+    name: "demo-scraper",
+    ageDays: 60,
+    envs: [{ name: "production", services: [{ name: "scraper", image: "python:3.12-slim", history: ["REMOVED", "REMOVED"], ranFraction: 0.4, rates: { cpu: 0.01, mem: 0.1, egressPerDay: 0.02 } }] }],
   },
   {
     ws: "personal",
@@ -366,8 +375,11 @@ function buildWorld(): World {
         const since = Math.max(ws.periodStart, envCreated);
         const elapsedMin = Math.max(0, (now - since) / MINUTE);
         const accrued: Accrued = { cpu: 0, mem: 0, egress: 0 };
+        let accruedSpan: [number, number] | null = null;
         if (!running && svc.ranFraction) {
           const ran = elapsedMin * svc.ranFraction;
+          // It ran at the start of the period and has been off since.
+          accruedSpan = [since, since + ran * MINUTE];
           accrued.cpu = baseRates.cpu * ran;
           accrued.mem = baseRates.mem * ran;
           accrued.egress = (baseRates.egressPerDay / 1440) * ran;
@@ -391,6 +403,7 @@ function buildWorld(): World {
           rates: running ? baseRates : ZERO_RATES,
           ratesSince: since,
           accrued,
+          accruedSpan,
           deleted: false,
         });
 
@@ -472,6 +485,8 @@ function accruedAt(instance: MInstance, at: number): Accrued {
 }
 
 function setRates(instance: MInstance, rates: Rates, at = Date.now()) {
+  const wasRunning = instance.rates.cpu + instance.rates.mem + instance.rates.egressPerDay > 0;
+  if (wasRunning) instance.accruedSpan = [instance.accruedSpan?.[0] ?? instance.ratesSince, at];
   instance.accrued = accruedAt(instance, at);
   instance.ratesSince = at;
   instance.rates = rates;
@@ -628,6 +643,22 @@ function usageRows(w: World, ws: MWorkspace, measurements: string[], groupBy: st
         add(project.id, f.serviceId, null, "CPU_USAGE", f.cpu);
         add(project.id, f.serviceId, null, "MEMORY_USAGE_GB", f.mem);
         add(project.id, f.serviceId, null, "NETWORK_TX_GB", f.egress);
+      }
+    } else if (from >= ws.periodStart) {
+      // A window inside the current period (e.g. the last two days): only what actually ran then.
+      const end = Math.min(to, now);
+      const overlap = (a: number, b: number) => Math.max(0, Math.min(end, b) - Math.max(from, a));
+      for (const instance of project.instances) {
+        const span = instance.accruedSpan;
+        const share = span && span[1] > span[0] ? overlap(span[0], span[1]) / (span[1] - span[0]) : 0;
+        const liveMin = overlap(instance.ratesSince, now) / MINUTE;
+        const r = instance.rates;
+        add(project.id, instance.serviceId, instance.environmentId, "CPU_USAGE", instance.accrued.cpu * share + r.cpu * liveMin);
+        add(project.id, instance.serviceId, instance.environmentId, "MEMORY_USAGE_GB", instance.accrued.mem * share + r.mem * liveMin);
+        add(project.id, instance.serviceId, instance.environmentId, "NETWORK_TX_GB", instance.accrued.egress * share + (r.egressPerDay / 1440) * liveMin);
+      }
+      for (const volume of project.volumes) {
+        add(project.id, volume.serviceId, volume.environmentId, "DISK_USAGE_GB", volumeGbMinutes(volume, end) - volumeGbMinutes(volume, from));
       }
     } else {
       // Previous period: steady-state usage with some month-to-month variation.
@@ -1191,11 +1222,18 @@ const HANDLERS: Record<string, Handler> = {
 
   ProjectUpdate: (w, v, op) => {
     const project = findProject(w, v.id, op);
-    const input = v.input as { name?: unknown } | undefined;
-    const name = typeof input?.name === "string" ? input.name.trim() : "";
-    if (!name) throw refuse("Project name is required", op);
-    project.name = name;
-    return { projectUpdate: { id: project.id, name: project.name } };
+    const input = (v.input ?? {}) as { name?: unknown; description?: unknown };
+    if (input.name === undefined && input.description === undefined) throw refuse("Nothing to update", op);
+    if (input.name !== undefined) {
+      const name = typeof input.name === "string" ? input.name.trim() : "";
+      if (!name) throw refuse("Project name is required", op);
+      project.name = name;
+    }
+    if (input.description !== undefined) {
+      if (typeof input.description !== "string") throw refuse("Description must be a string", op);
+      project.description = input.description.trim() || null;
+    }
+    return { projectUpdate: { id: project.id, name: project.name, description: project.description } };
   },
 
   ProjectScheduleDelete: (w, v, op) => {
