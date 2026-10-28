@@ -117,9 +117,21 @@ export async function fetchLogsAction(accountKey: unknown, deploymentId: unknown
   }
 }
 
-/** Drop cached Railway responses; the client then calls router.refresh(). */
+/**
+ * The Refresh button: forget every saved Railway read (in memory and on disk) and what was read
+ * from local clones and GitHub, so the next render reads everything again. The client then calls
+ * router.refresh().
+ */
 export async function refreshDataAction(): Promise<void> {
   clearCache();
+  const [{ clearRepoInfoCache }, { clearSummaryStatusCache }, { clearCloneCache }] = await Promise.all([
+    import("@/lib/code"),
+    import("@/lib/code/ai-summary"),
+    import("@/lib/code/sources"),
+  ]);
+  clearRepoInfoCache();
+  clearSummaryStatusCache();
+  clearCloneCache();
 }
 
 export async function getWriteModeAction(): Promise<ActionResult<{ writeMode: boolean }>> {

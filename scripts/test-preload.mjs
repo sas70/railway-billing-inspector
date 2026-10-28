@@ -30,8 +30,8 @@ test("a project page preloads all the tabs", () => {
   assert.equal(routesToPreload("/a/main/p/123").length, PRELOAD_ROUTES.length);
 });
 
-test("pages are kept as long as Next allows for prefetched pages", () => {
-  // staleTimes.static must be at least 30 s; an hour matches the server's read cache.
+test("pages are kept for a week, so in practice until Refresh", () => {
+  // staleTimes.static must be at least 30 s.
   assert.ok(KEEP_PAGES_SECONDS >= 30);
-  assert.equal(KEEP_PAGES_SECONDS, 3600);
+  assert.equal(KEEP_PAGES_SECONDS, 7 * 24 * 60 * 60);
 });

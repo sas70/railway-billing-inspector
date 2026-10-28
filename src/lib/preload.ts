@@ -5,8 +5,12 @@
  */
 export const PRELOAD_ROUTES = ["/", "/services", "/search", "/billing", "/billing?period=previous", "/audit"] as const;
 
-/** How long the browser keeps a page it has shown or preloaded, in seconds. Matches the server's read cache. */
-export const KEEP_PAGES_SECONDS = 60 * 60;
+/**
+ * How long the browser keeps a page it has shown or preloaded, in seconds: a week, so in practice
+ * until you press Refresh (which throws them away). Reloading the browser tab also starts fresh,
+ * but the server answers from its saved copy, so that's quick too.
+ */
+export const KEEP_PAGES_SECONDS = 7 * 24 * 60 * 60;
 
 /** Wait this long after the page settles before preloading, so the page you opened gets Railway's attention first. */
 export const PRELOAD_DELAY_MS = 1_500;

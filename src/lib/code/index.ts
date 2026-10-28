@@ -59,7 +59,10 @@ async function resolveSource(repo: string): Promise<RepoSource> {
 
 const README_RE = /^readme(\.(md|markdown|mdx|txt|rst))?$/i;
 const infoCache = new Map<string, { at: number; info: RepoInfo }>();
-const INFO_TTL = 10 * 60_000;
+/** README and description per repo, kept until Refresh (see clearRepoInfoCache). */
+export function clearRepoInfoCache() {
+  infoCache.clear();
+}
 
 async function localInfo(repo: string, dir: string): Promise<Pick<RepoInfo, "description" | "readme">> {
   const names = await readdir(dir);
@@ -91,7 +94,7 @@ async function githubInfo(repo: string, token: string): Promise<Pick<RepoInfo, "
 export async function repoInfo(repo: string, fresh = false): Promise<RepoInfo> {
   const key = repoKey(repo);
   const cached = infoCache.get(key);
-  if (!fresh && cached && Date.now() - cached.at < INFO_TTL) return cached.info;
+  if (!fresh && cached) return cached.info;
 
   const source = await resolveSource(repo);
   const info: RepoInfo = { repo, source, description: null, readme: null, error: null };

@@ -34,7 +34,7 @@ function Footer() {
   return (
     <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-ink-2 sm:px-6">
       <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-4">
-        <span>Pages keep what they read from Railway until you press Refresh (at most an hour).</span>
+        <span>Pages keep what they read from Railway until you press Refresh, even after a restart.</span>
         <span>Costs are estimates (usage × Railway list prices); your invoice is authoritative.</span>
         <a href="/roadmap.html" className="link">Roadmap and feature ideas</a>
         {budgets.map((b) => (
