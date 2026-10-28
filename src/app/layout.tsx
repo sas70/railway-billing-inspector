@@ -36,6 +36,7 @@ function Footer() {
       <div className="flex flex-wrap gap-x-5 gap-y-1 border-t border-line pt-4">
         <span>Pages keep what they read from Railway until you press Refresh, even after a restart.</span>
         <span>Costs are estimates (usage × Railway list prices); your invoice is authoritative.</span>
+        <a href="/tour.html" className="link">Tour</a>
         <a href="/roadmap.html" className="link">Roadmap and feature ideas</a>
         {budgets.map((b) => (
           <span key={b.label} className="tabular">

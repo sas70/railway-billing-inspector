@@ -119,7 +119,7 @@ function DescribeDialog({ scope, onClose }: { scope?: DescribeScope; onClose: ()
         if (running) event.preventDefault();
       }}
       onClose={handleClosed}
-      className="m-auto w-[min(760px,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-0 text-ink shadow-2xl"
+      className="m-auto w-[min(760px,calc(100vw-2rem))] rounded-xl border border-line bg-surface p-0 text-left font-normal text-ink shadow-2xl"
     >
       <div className="flex max-h-[85vh] flex-col">
         <header className="border-b border-line px-5 py-4">
