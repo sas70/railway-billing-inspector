@@ -34,7 +34,9 @@ export const AiSummarySchema = z.object({
   features: z.array(z.string()).describe("Up to 6 things the app actually does, from the code"),
   services: z.array(z.string()).describe("External APIs and services it calls, e.g. ['OpenAI', 'Stripe', 'Firestore']"),
   entrypoint: z.string().describe("How it starts in production, e.g. 'gunicorn app:app' or 'next start'"),
-  keywords: z.array(z.string()).describe("Up to 10 search keywords someone might use to find this app"),
+  keywords: z
+    .array(z.string())
+    .describe("Up to 10 search keywords someone might use to find this app, including its subject area (e.g. 'image segmentation', 'bank reconciliation', 'speech translation')"),
 });
 export type AiSummary = z.infer<typeof AiSummarySchema>;
 

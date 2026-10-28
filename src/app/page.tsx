@@ -32,6 +32,7 @@ import { dateNoYear, money, plural, relative } from "@/lib/format";
 import { emptyHealthCounts, needsAttention } from "@/lib/health";
 import { isGeneratedRailwayName, projectNameHints } from "@/lib/project-name";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
+import { ensureIndex } from "@/lib/search-index/build";
 import { blurbText, type RepoBlurb } from "@/lib/repo-blurb";
 import { billStructure, cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
 
@@ -47,6 +48,8 @@ export default async function OverviewPage() {
     uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace, { recent: true })),
   );
   const allProjects = bundles.flatMap((b) => (b.projects.ok ? b.projects.value : []));
+  // First run (or a day later): build the search index in the background from what was just read.
+  ensureIndex();
   const unmatchedProtected = bundles.every((b) => b.projects.ok) ? unmatchedProtectedEntries(allProjects) : [];
   // Hover cards: saved summaries / local READMEs only, so this adds no Railway or GitHub calls.
   const blurbs = await repoBlurbs(allProjects.flatMap((p) => p.repos));

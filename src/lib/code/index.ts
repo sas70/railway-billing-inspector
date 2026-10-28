@@ -4,6 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { isMockMode } from "../config";
+import { cachedCopy } from "../search-index/repo-cache";
 import { MOCK_REPOS } from "./mock-corpus";
 import { around, matchingLines, summarizeReadme, type ReadmeSummary } from "./readme";
 import { cloneFor, GitHubError, githubGet, githubToken, localClones, localRoots, mapLimit, repoKey, run } from "./sources";
@@ -14,7 +15,7 @@ import { cloneFor, GitHubError, githubGet, githubToken, localClones, localRoots,
  */
 
 export type RepoSource =
-  | { kind: "local"; dir: string; matchedBy: "remote" | "folder" }
+  | { kind: "local"; dir: string; matchedBy: "remote" | "folder" | "copy" }
   | { kind: "github" }
   | { kind: "mock" }
   | { kind: "none"; reason: string };
@@ -42,6 +43,9 @@ async function resolveSource(repo: string): Promise<RepoSource> {
   if (isMockMode()) return MOCK_REPOS[repoKey(repo)] ? { kind: "mock" } : { kind: "none", reason: "Not in the demo data." };
   const found = cloneFor(repo, await localClones());
   if (found) return { kind: "local", dir: found.clone.dir, matchedBy: found.matchedBy };
+  // A GitHub-only repo the search index has downloaded: read it like a clone (no rate limits).
+  const copy = cachedCopy(repo);
+  if (copy) return { kind: "local", dir: copy, matchedBy: "copy" };
   if (await githubToken()) return { kind: "github" };
   return {
     kind: "none",

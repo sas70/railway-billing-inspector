@@ -12,7 +12,8 @@ import { isMockMode } from "../config";
  * Where each project's code lives: a local clone (found under CODE_LOCAL_ROOTS) or GitHub.
  *
  * Everything here is read-only. Local clones are only read (`git ls-files`/`git grep` and
- * file reads); GitHub is only sent GET requests. Nothing is cloned, fetched or written.
+ * file reads); GitHub is only sent GET requests. (The search index keeps its own read-only copies
+ * of GitHub-only repos in data/search-index/repos; see lib/search-index/repo-cache.ts.)
  */
 
 export const run = promisify(execFile);
