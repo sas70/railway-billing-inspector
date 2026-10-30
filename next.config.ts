@@ -4,6 +4,8 @@ import { KEEP_PAGES_SECONDS } from "./src/lib/preload";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // This folder is the project root, even when a parent folder has its own package-lock.json.
+  turbopack: { root: process.cwd() },
   // Native or large server-only packages for the search index: load them from node_modules at
   // runtime instead of bundling them.
   serverExternalPackages: ["better-sqlite3", "@huggingface/transformers", "onnxruntime-node"],
