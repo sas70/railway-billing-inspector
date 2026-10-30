@@ -1,0 +1,180 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;background:#F1F5EC}
+  svg{display:block}
+  .cap{font-family:'Patrick Hand',cursive;font-size:30px;fill:#1E2B24}
+  .say{font-family:'Patrick Hand',cursive;font-size:29px;fill:#1E2B24}
+  .board{font-family:'Archivo',sans-serif;font-stretch:80%;font-weight:600;font-size:21px;fill:#F2B544}
+  .boardh{font-family:'Archivo',sans-serif;font-stretch:80%;font-weight:700;font-size:17px;fill:#9FB7A9}
+  .rc{font-family:'Archivo',sans-serif;font-stretch:85%;font-size:17px;fill:#3A4A41}
+  .tag{font-family:'Archivo',sans-serif;font-stretch:85%;font-weight:700;font-size:16px}
+  .big{font-family:'Archivo',sans-serif;font-stretch:90%;font-weight:800;font-size:30px;fill:#C43B2F}
+</style></head><body>
+<svg id="comic" xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080">
+  <defs>
+    <!-- Me: round head, glasses, sweater. Origin at feet center. -->
+    <g id="head">
+      <circle cx="0" cy="-205" r="38" fill="#E8B98F" stroke="#1E2B24" stroke-width="3"/>
+      <path d="M-38,-212 C-36,-250 34,-256 39,-214 C24,-232 -14,-236 -38,-212Z" fill="#2E2A26" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/>
+      <circle cx="-14" cy="-203" r="10" fill="#fff" stroke="#1E2B24" stroke-width="3"/>
+      <circle cx="14" cy="-203" r="10" fill="#fff" stroke="#1E2B24" stroke-width="3"/>
+      <line x1="-4" y1="-203" x2="4" y2="-203" stroke="#1E2B24" stroke-width="3"/>
+      <circle cx="-12" cy="-202" r="3" fill="#1E2B24"/><circle cx="16" cy="-202" r="3" fill="#1E2B24"/>
+    </g>
+    <g id="body">
+      <path d="M-34,-163 C-40,-150 -44,-110 -42,-70 L42,-70 C44,-110 40,-150 34,-163 C20,-170 -20,-170 -34,-163Z" fill="#2F7A63" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-32,-70 L-30,-2 M30,-70 L28,-2" stroke="#1E2B24" stroke-width="16" stroke-linecap="round"/>
+      <path d="M-32,-70 L-30,-2 M30,-70 L28,-2" stroke="#3B4A6B" stroke-width="10" stroke-linecap="round"/>
+      <ellipse cx="-34" cy="0" rx="18" ry="7" fill="#1E2B24"/><ellipse cx="34" cy="0" rx="18" ry="7" fill="#1E2B24"/>
+    </g>
+    <g id="car">
+      <rect x="0" y="0" width="150" height="74" rx="10" fill="#2A78D6" stroke="#1E2B24" stroke-width="3"/>
+      <rect x="14" y="14" width="34" height="26" rx="4" fill="#DDEBFA" stroke="#1E2B24" stroke-width="2"/>
+      <rect x="58" y="14" width="34" height="26" rx="4" fill="#DDEBFA" stroke="#1E2B24" stroke-width="2"/>
+      <rect x="102" y="14" width="34" height="26" rx="4" fill="#DDEBFA" stroke="#1E2B24" stroke-width="2"/>
+      <circle cx="34" cy="80" r="12" fill="#1E2B24"/><circle cx="116" cy="80" r="12" fill="#1E2B24"/>
+    </g>
+    <g id="ghostcar">
+      <rect x="0" y="0" width="150" height="74" rx="10" fill="rgba(220,235,250,0.18)" stroke="#CFE3F6" stroke-width="3" stroke-dasharray="10 8"/>
+      <rect x="14" y="14" width="34" height="26" rx="4" fill="none" stroke="#CFE3F6" stroke-width="2" stroke-dasharray="5 5"/>
+      <rect x="58" y="14" width="34" height="26" rx="4" fill="none" stroke="#CFE3F6" stroke-width="2" stroke-dasharray="5 5"/>
+      <rect x="102" y="14" width="34" height="26" rx="4" fill="none" stroke="#CFE3F6" stroke-width="2" stroke-dasharray="5 5"/>
+      <circle cx="34" cy="80" r="12" fill="none" stroke="#CFE3F6" stroke-width="3" stroke-dasharray="6 5"/><circle cx="116" cy="80" r="12" fill="none" stroke="#CFE3F6" stroke-width="3" stroke-dasharray="6 5"/>
+    </g>
+    <clipPath id="p1"><rect x="0" y="0" width="784" height="532" rx="8"/></clipPath>
+    <clipPath id="p2"><rect x="0" y="0" width="784" height="532" rx="8"/></clipPath>
+    <clipPath id="p3"><rect x="0" y="0" width="784" height="532" rx="8"/></clipPath>
+    <clipPath id="p4"><rect x="0" y="0" width="784" height="532" rx="8"/></clipPath>
+  </defs>
+
+  <!-- Panel 1: the names -->
+  <g transform="translate(8,8)">
+    <g clip-path="url(#p1)">
+      <rect width="784" height="532" fill="#FBFCF8"/>
+      <g stroke="#DCE7D5" stroke-width="2">
+        <line x1="0" y1="470" x2="784" y2="470"/>
+      </g>
+      <rect x="312" y="96" width="440" height="300" rx="10" fill="#23302A" stroke="#1E2B24" stroke-width="3"/>
+      <text class="boardh" x="336" y="132">Project</text><text class="boardh" x="640" y="132">Does what?</text>
+      <line x1="336" y1="144" x2="728" y2="144" stroke="#3F5147" stroke-width="2"/>
+      <text class="board" x="336" y="180">steadfast-fascination</text><text class="board" x="672" y="180">???</text>
+      <text class="board" x="336" y="218">heroic-contentment</text><text class="board" x="672" y="218">???</text>
+      <text class="board" x="336" y="256">lively-vision</text><text class="board" x="672" y="256">???</text>
+      <text class="board" x="336" y="294">profound-upliftment</text><text class="board" x="672" y="294">???</text>
+      <text class="board" x="336" y="332">unarmed-zoo</text><text class="board" x="672" y="332">???</text>
+      <text class="board" x="336" y="370" opacity=".55">…and 89 more</text>
+      <line x1="430" y1="396" x2="430" y2="470" stroke="#1E2B24" stroke-width="6"/>
+      <line x1="634" y1="396" x2="634" y2="470" stroke="#1E2B24" stroke-width="6"/>
+      <g transform="translate(170,470)"><use href="#body"/><use href="#head"/>
+        <path d="M-34,-150 C-60,-120 -64,-100 -50,-84" fill="none" stroke="#1E2B24" stroke-width="13" stroke-linecap="round"/>
+        <path d="M-34,-150 C-60,-120 -64,-100 -50,-84" fill="none" stroke="#2F7A63" stroke-width="7" stroke-linecap="round"/>
+        <path d="M34,-152 C56,-180 44,-206 26,-214" fill="none" stroke="#1E2B24" stroke-width="13" stroke-linecap="round"/>
+        <path d="M34,-152 C56,-180 44,-206 26,-214" fill="none" stroke="#2F7A63" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="24" cy="-216" r="8" fill="#E8B98F" stroke="#1E2B24" stroke-width="3"/>
+      </g>
+      <path d="M174,204 L190,236 L209,195 Z" fill="#fff" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/><ellipse cx="170" cy="150" rx="118" ry="62" fill="#fff" stroke="#1E2B24" stroke-width="3"/><path d="M174,204 L190,236 L209,195 Z" fill="#fff" transform="translate(0,0)" style="transform-box:fill-box;transform-origin:center;transform:scale(.86)"/>
+      <text class="say" x="170" y="142" text-anchor="middle">Which one was</text><text class="say" x="170" y="176" text-anchor="middle">the invoice bot?</text>
+      <rect x="0" y="0" width="784" height="60" fill="#FFF3C9"/><line x1="0" y1="60" x2="784" y2="60" stroke="#1E2B24" stroke-width="3"/>
+      <text class="cap" x="24" y="41">94 projects, every name picked by a dice roll.</text>
+    </g>
+    <rect width="784" height="532" rx="8" fill="none" stroke="#1E2B24" stroke-width="4"/>
+  </g>
+
+  <!-- Panel 2: the bill -->
+  <g transform="translate(808,8)">
+    <g clip-path="url(#p2)">
+      <rect width="784" height="532" fill="#FBFCF8"/>
+      <line x1="0" y1="470" x2="784" y2="470" stroke="#DCE7D5" stroke-width="2"/>
+      <!-- receipt -->
+      <path d="M390,150 L560,150 L560,470 L620,470 L640,500 L330,500 L350,470 L390,470 Z" fill="#fff" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/>
+      <g class="rc">
+        <text x="404" y="182">steadfast-fascination</text><text x="404" y="208">heroic-contentment</text>
+        <text x="404" y="234">lively-vision</text><text x="404" y="260">profound-upliftment</text>
+        <text x="404" y="286">daring-beauty</text><text x="404" y="312">worthy-hope</text>
+        <text x="404" y="338">unarmed-zoo</text><text x="404" y="364">pure-gentleness</text>
+      </g>
+      <line x1="404" y1="384" x2="546" y2="384" stroke="#3A4A41" stroke-width="2" stroke-dasharray="4 4"/>
+      <text class="big" x="420" y="426">$120</text><text class="rc" x="420" y="456">a month</text>
+      <ellipse cx="456" cy="416" rx="56" ry="28" fill="none" stroke="#C43B2F" stroke-width="4" transform="rotate(-4 456 416)"/>
+      <g transform="translate(250,470)"><use href="#body"/><use href="#head"/>
+        <path d="M34,-150 C80,-140 110,-160 136,-200" fill="none" stroke="#1E2B24" stroke-width="13" stroke-linecap="round"/>
+        <path d="M34,-150 C80,-140 110,-160 136,-200" fill="none" stroke="#2F7A63" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="140" cy="-204" r="8" fill="#E8B98F" stroke="#1E2B24" stroke-width="3"/>
+        <path d="M-34,-150 C-56,-120 -54,-96 -44,-84" fill="none" stroke="#1E2B24" stroke-width="13" stroke-linecap="round"/>
+        <path d="M-34,-150 C-56,-120 -54,-96 -44,-84" fill="none" stroke="#2F7A63" stroke-width="7" stroke-linecap="round"/>
+        <path d="M-10,-182 Q0,-176 10,-182" fill="none" stroke="#1E2B24" stroke-width="3" stroke-linecap="round"/>
+        <path d="M44,-236 q6,10 0,16 q-6,-6 0,-16Z" fill="#7FB8E6" stroke="#1E2B24" stroke-width="2"/>
+      </g>
+      <path d="M215,191 L236,232 L243,168 Z" fill="#fff" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/><ellipse cx="160" cy="142" rx="130" ry="60" fill="#fff" stroke="#1E2B24" stroke-width="3"/><path d="M215,191 L236,232 L243,168 Z" fill="#fff" transform="translate(0,0)" style="transform-box:fill-box;transform-origin:center;transform:scale(.86)"/>
+      <text class="say" x="160" y="134" text-anchor="middle">For apps I forgot</text><text class="say" x="160" y="168" text-anchor="middle">I even had?</text>
+      <rect x="0" y="0" width="784" height="60" fill="#FFF3C9"/><line x1="0" y1="60" x2="784" y2="60" stroke="#1E2B24" stroke-width="3"/>
+      <text class="cap" x="24" y="41">Then came the bill.</text>
+    </g>
+    <rect width="784" height="532" rx="8" fill="none" stroke="#1E2B24" stroke-width="4"/>
+  </g>
+
+  <!-- Panel 3: the switch -->
+  <g transform="translate(8,548)">
+    <g clip-path="url(#p3)">
+      <rect width="784" height="532" fill="#FBFCF8"/>
+      <line x1="0" y1="470" x2="784" y2="470" stroke="#DCE7D5" stroke-width="2"/>
+      <!-- track with stopped cars -->
+      <line x1="320" y1="430" x2="784" y2="430" stroke="#6B7A71" stroke-width="5"/>
+      <g opacity=".35" transform="translate(300,344)"><use href="#car"/></g>
+      <g opacity=".35" transform="translate(462,344)"><use href="#car"/></g>
+      <g transform="translate(624,344)"><use href="#car"/></g>
+      <text class="tag" x="699" y="332" fill="#2F7A63" text-anchor="middle">still needed</text>
+      <!-- lever -->
+      <rect x="200" y="380" width="110" height="90" rx="8" fill="#23302A" stroke="#1E2B24" stroke-width="3"/>
+      <text class="tag" x="214" y="412" fill="#9FB7A9">ON</text><text class="tag" x="264" y="456" fill="#F2B544">OFF</text>
+      <line x1="255" y1="430" x2="300" y2="300" stroke="#1E2B24" stroke-width="12" stroke-linecap="round"/>
+      <circle cx="300" cy="300" r="20" fill="#C43B2F" stroke="#1E2B24" stroke-width="3"/>
+      <g transform="translate(120,470)"><use href="#body"/><use href="#head"/>
+        <path d="M34,-150 C90,-160 150,-180 172,-170" fill="none" stroke="#1E2B24" stroke-width="13" stroke-linecap="round"/>
+        <path d="M34,-150 C90,-160 150,-180 172,-170" fill="none" stroke="#2F7A63" stroke-width="7" stroke-linecap="round"/>
+        <circle cx="176" cy="-170" r="8" fill="#E8B98F" stroke="#1E2B24" stroke-width="3"/>
+        <path d="M-12,-184 Q0,-174 12,-184" fill="none" stroke="#1E2B24" stroke-width="3" stroke-linecap="round"/>
+      </g>
+      <path d="M398,149 L330,262 L415,181 Z" fill="#fff" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/><ellipse cx="560" cy="140" rx="212" ry="66" fill="#fff" stroke="#1E2B24" stroke-width="3"/><path d="M398,149 L330,262 L415,181 Z" fill="#fff" transform="translate(0,0)" style="transform-box:fill-box;transform-origin:center;transform:scale(.86)"/>
+      <text class="say" x="560" y="132" text-anchor="middle">Everything off in one click.</text><text class="say" x="560" y="166" text-anchor="middle">Back on: only what I need.</text>
+      <rect x="0" y="0" width="784" height="60" fill="#FFF3C9"/><line x1="0" y1="60" x2="784" y2="60" stroke="#1E2B24" stroke-width="3"/>
+      <text class="cap" x="24" y="41">So I built an inspector.</text>
+    </g>
+    <rect width="784" height="532" rx="8" fill="none" stroke="#1E2B24" stroke-width="4"/>
+  </g>
+
+  <!-- Panel 4: the ghosts -->
+  <g transform="translate(808,548)">
+    <g clip-path="url(#p4)">
+      <rect width="784" height="532" fill="#1F2D3A"/>
+      <circle cx="690" cy="130" r="34" fill="#F4E9C8" opacity=".9"/><circle cx="676" cy="122" r="34" fill="#1F2D3A"/>
+      <line x1="0" y1="430" x2="784" y2="430" stroke="#5E7186" stroke-width="5"/>
+      <line x1="0" y1="470" x2="784" y2="470" stroke="#33465A" stroke-width="2"/>
+      <g transform="translate(250,344)"><use href="#ghostcar"/></g>
+      <g transform="translate(412,344)"><use href="#ghostcar"/></g>
+      <g transform="translate(574,344)"><use href="#ghostcar"/></g>
+      <text class="tag" x="325" y="500" fill="#CFE3F6" text-anchor="middle">memory</text>
+      <text class="tag" x="487" y="500" fill="#CFE3F6" text-anchor="middle">memory</text>
+      <text class="tag" x="649" y="500" fill="#CFE3F6" text-anchor="middle">volume</text>
+      <path d="M232,380 l-40,0 M232,396 l-60,0 M232,412 l-30,0" stroke="#5E7186" stroke-width="3" stroke-linecap="round"/>
+      <ellipse cx="487" cy="388" rx="266" ry="70" fill="none" stroke="#E2574C" stroke-width="5" transform="rotate(-2 487 388)"/>
+      <rect x="540" y="200" width="196" height="64" rx="8" fill="#F1F5EC" stroke="#1E2B24" stroke-width="3"/>
+      <text class="big" x="638" y="244" style="font-size:28px" text-anchor="end">$0.20</text><text class="rc" x="648" y="244" style="font-size:20px;fill:#1E2B24">a day</text>
+      <g transform="translate(120,470)"><use href="#body"/><use href="#head"/>
+        <path d="M34,-150 C70,-150 92,-170 100,-196" fill="none" stroke="#1E2B24" stroke-width="13" stroke-linecap="round"/>
+        <path d="M34,-150 C70,-150 92,-170 100,-196" fill="none" stroke="#2F7A63" stroke-width="7" stroke-linecap="round"/>
+        <line x1="100" y1="-196" x2="116" y2="-222" stroke="#1E2B24" stroke-width="8" stroke-linecap="round"/>
+        <circle cx="130" cy="-246" r="28" fill="rgba(207,227,246,.25)" stroke="#F1F5EC" stroke-width="7"/>
+        <circle cx="130" cy="-246" r="28" fill="none" stroke="#1E2B24" stroke-width="2"/>
+      </g>
+      <path d="M132,204 L150,240 L167,195 Z" fill="#fff" stroke="#1E2B24" stroke-width="3" stroke-linejoin="round"/><ellipse cx="130" cy="160" rx="98" ry="50" fill="#fff" stroke="#1E2B24" stroke-width="3"/><path d="M132,204 L150,240 L167,195 Z" fill="#fff" transform="translate(0,0)" style="transform-box:fill-box;transform-origin:center;transform:scale(.86)"/>
+      <text class="say" x="130" y="170" text-anchor="middle">Found you.</text>
+      <rect x="0" y="0" width="784" height="60" fill="#FFF3C9"/><line x1="0" y1="60" x2="784" y2="60" stroke="#1E2B24" stroke-width="3"/>
+      <text class="cap" x="24" y="41">But some trains kept billing with nobody on board.</text>
+    </g>
+    <rect width="784" height="532" rx="8" fill="none" stroke="#1E2B24" stroke-width="4"/>
+  </g>
+</svg>
+</body></html>
