@@ -29,13 +29,14 @@ export function BulkMasterButtons({ rows, readOnly }: { rows: ServiceCatalogRow[
   const [flow, setFlow] = useState<{ mode: BulkMode; visible: ServiceCatalogRow[]; candidates: ServiceCatalogRow[] } | null>(null);
   const eligibleOn = rows.filter((r) => !r.online && !r.protected);
   const eligibleOff = rows.filter((r) => r.online && !r.protected && r.liveDeploymentIds.length > 0 && r.health !== "deploying");
+  const eligibleStopped = rows.filter((r) => !r.protected && r.stoppedDeploymentIds.length > 0);
   const lock = readOnly ? "Read-only — enable Write mode in the header" : undefined;
 
   function open(mode: BulkMode) {
     setFlow({
       mode,
       visible: rows,
-      candidates: mode === "on" ? eligibleOn : eligibleOff,
+      candidates: mode === "on" ? eligibleOn : mode === "stopped" ? eligibleStopped : eligibleOff,
     });
   }
 
@@ -61,6 +62,21 @@ export function BulkMasterButtons({ rows, readOnly }: { rows: ServiceCatalogRow[
         <Icon name="power" size={12} />
         Turn all projects OFF
       </button>
+      {eligibleStopped.length > 0 && (
+        <button
+          type="button"
+          className={buttonClass("neutral", "sm")}
+          disabled={!!lock}
+          title={
+            lock ??
+            "Railway marked these deployments stopped but still lists them as active, and can keep billing memory for them. Review and remove them."
+          }
+          onClick={() => open("stopped")}
+        >
+          <Icon name="power" size={12} />
+          Remove stopped ({eligibleStopped.length})
+        </button>
+      )}
       {flow && <BulkFlow mode={flow.mode} rows={flow.visible} candidates={flow.candidates} onClose={() => setFlow(null)} />}
     </>
   );
@@ -105,6 +121,7 @@ function ConfirmDialog({
   const skipped = rows.length - candidates.length;
   const dollars = candidates.reduce((sum, r) => sum + (r.expectedCost ?? 0), 0);
   const on = mode === "on";
+  const stopped = mode === "stopped";
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -123,8 +140,25 @@ function ConfirmDialog({
       <div className="px-5 py-4">
         <div className="text-xs font-medium uppercase tracking-wide text-ink-2">Confirm first</div>
         <h2 id={titleId} className="mt-1 text-lg font-semibold">
-          {on ? "Turn all projects ON?" : "Turn all projects OFF?"}
+          {on ? "Turn all projects ON?" : stopped ? "Remove stopped deployments that still bill?" : "Turn all projects OFF?"}
         </h2>
+        {stopped ? (
+          <div className="mt-3 space-y-3 text-sm">
+            <p>
+              Railway marked a deployment in <strong>{plural(candidates.length, "service")}</strong> across{" "}
+              <strong>{plural(projects, "project")}</strong> as stopped, but still lists it as the active deployment.
+              Nothing is serving traffic from them, yet Railway can keep billing their memory.
+            </p>
+            <p>
+              Most came from Railway’s 2025 runtime migration. Removing them is the same as Railway’s “Remove” on the
+              deployment: settings, variables, domains and volumes stay.
+            </p>
+            <p className="text-ink-2">
+              Check the bill summary a day later to confirm the charge stopped. Next you’ll review the live list and
+              type a confirmation phrase. Nothing changes on this step.
+            </p>
+          </div>
+        ) : (
         <div className="mt-3 space-y-3 text-sm">
           <p>
             Railway has no single “project power” switch. This will {on ? "redeploy" : "stop"}{" "}
@@ -147,6 +181,7 @@ function ConfirmDialog({
           </p>
           <p className="text-ink-2">Next you’ll review the live list and type a confirmation phrase. Nothing changes on this step.</p>
         </div>
+        )}
       </div>
       <footer className="flex justify-end gap-2 border-t border-line px-5 py-3">
         <button type="button" className={buttonClass("neutral", "md")} onClick={() => dialogRef.current?.close()}>
@@ -345,7 +380,7 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
               {plan && (
                 <button
                   type="button"
-                  className={buttonClass(plan.mode === "off" ? "danger" : "primary", "md")}
+                  className={buttonClass(plan.mode === "on" ? "primary" : "danger", "md")}
                   disabled={!canApprove}
                   onClick={() => void approve(plan)}
                 >

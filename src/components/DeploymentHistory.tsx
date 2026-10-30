@@ -22,6 +22,8 @@ export type DeploymentRowView = {
   reason?: string;
   image?: string;
   isLive: boolean;
+  /** Railway marked it stopped but still lists it as active, so it can still bill memory. */
+  stillBilled?: boolean;
   canRedeploy: boolean;
   canRollback: boolean;
 };
@@ -216,6 +218,14 @@ export function DeploymentHistory({
                     </span>
                     {row.isLive && (
                       <span className="ml-1.5 rounded border border-line bg-[var(--info-wash)] px-1 py-px text-[11px] font-semibold">LIVE</span>
+                    )}
+                    {row.stillBilled && (
+                      <span
+                        className="ml-1.5 rounded border border-line bg-[var(--warning-wash)] px-1 py-px text-[11px] font-semibold"
+                        title="Railway marked this deployment stopped but still lists it as active, so it can keep billing memory."
+                      >
+                        STOPPED, STILL ACTIVE
+                      </span>
                     )}
                   </td>
                   <td className="max-w-0 px-2 py-2 align-top">

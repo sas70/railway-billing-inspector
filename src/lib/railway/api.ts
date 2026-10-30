@@ -140,6 +140,8 @@ export type InstanceSummary = {
   health: Health;
   degraded: boolean;
   liveDeploymentIds: string[];
+  /** Stopped by Railway but still listed as active; see HealthResult.stoppedDeploymentIds. */
+  stoppedDeploymentIds: string[];
   latest: { id: string; status: T.DeploymentStatus; createdAt: string } | null;
   publicDomains: string[];
   /** GitHub `owner/name` this instance deploys from, if any. */
@@ -187,6 +189,7 @@ function summarizeProject(node: T.ProjectNode): ProjectSummary {
         health: result.health,
         degraded: result.degraded,
         liveDeploymentIds: result.liveDeploymentIds,
+        stoppedDeploymentIds: result.stoppedDeploymentIds,
         latest: si.latestDeployment
           ? { id: si.latestDeployment.id, status: si.latestDeployment.status, createdAt: si.latestDeployment.createdAt }
           : null,

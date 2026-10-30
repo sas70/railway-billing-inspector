@@ -112,6 +112,10 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
         const state = billState({ recent: recentCost?.total ?? null, volumeSoFar: usage.cost.volume });
         const part = recentCost ? mainCostPart(recentCost) : null;
         const volumeShare = usage.cost.volume / soFar;
+        const stoppedInstances = project.environments.flatMap((e) =>
+          e.instances.filter((i) => i.stoppedDeploymentIds.length > 0).map((i) => ({ env: e, inst: i })),
+        );
+        const firstStopped = stoppedInstances[0];
         const ends = periodEnd ? ` when the billing period ends ${dateNoYear(periodEnd)}` : " when the billing period ends";
         out.push({
           key: `${project.id}-idle`,
@@ -124,7 +128,9 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
             ? [
                 `${money(soFar)} so far this period`,
                 state.perDay != null ? `${money(state.perDay)} a day over the last ${RECENT_DAYS} days${part ? `, mostly ${part.label}` : ""}` : null,
-                part?.key === "volume" || part?.key === "backup" || (!part && usage.cost.volume > 0)
+                stoppedInstances.length > 0 && part?.key !== "volume" && part?.key !== "backup" && part?.key !== "egress"
+                  ? `Railway marked ${stoppedInstances.length === 1 ? "a deployment" : `${stoppedInstances.length} deployments`} stopped but still lists ${stoppedInstances.length === 1 ? "it" : "them"} as active and bills the memory; open ${stoppedInstances.length === 1 ? "it" : "them"} and use Remove stopped (or Services → Remove stopped)`
+                  : part?.key === "volume" || part?.key === "backup" || (!part && usage.cost.volume > 0)
                   ? "volume storage bills every day until the volume is deleted"
                   : part?.key === "egress"
                     ? "something is still sending network traffic; open it to check its services"
@@ -135,7 +141,7 @@ export function cleanupCandidates(bundles: WorkspaceBundle[]): Candidate[] {
             : state.known
               ? `Nothing running and nothing charged in the last ${RECENT_DAYS} days. It was billed while it ran earlier in the period${volumeShare > 0.5 ? " (mostly volume storage, since deleted)" : ""}, and leaves this list${ends}.`
               : "Nothing running. Recent usage couldn't be read, so it isn't clear whether charges stopped; check Billing → Cost history.",
-          href: base,
+          href: firstStopped ? `${base}/s/${firstStopped.inst.serviceId}?env=${firstStopped.env.id}` : base,
           at: project.lastDeployAt,
           ongoing: true,
           charging: state.charging,
@@ -201,6 +207,7 @@ export function serviceCatalog(bundles: WorkspaceBundle[]): ServiceCatalogRow[] 
             degraded: inst.degraded,
             online: isOnlineHealth(inst.health),
             liveDeploymentIds: inst.liveDeploymentIds,
+            stoppedDeploymentIds: inst.stoppedDeploymentIds,
             latestId: inst.latest?.id ?? null,
             latestAt: inst.latest?.createdAt ?? null,
             latestLabel: relative(inst.latest?.createdAt),

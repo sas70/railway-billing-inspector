@@ -19,6 +19,11 @@ export type HealthResult = {
   /** An older deployment is still serving, but the newest one failed or crashed. */
   degraded: boolean;
   liveDeploymentIds: string[];
+  /**
+   * Deployments Railway marked stopped but still lists as active. Railway can keep billing these
+   * for memory (seen after its 2025 runtime migration), so they're worth removing.
+   */
+  stoppedDeploymentIds: string[];
 };
 
 export function instanceHealth(
@@ -28,21 +33,23 @@ export function instanceHealth(
   const activeList = active ?? [];
   const running = activeList.filter((d) => d.status === "SUCCESS" && !d.deploymentStopped);
   const liveDeploymentIds = activeList.filter((d) => !d.deploymentStopped && !GONE.has(d.status)).map((d) => d.id);
+  const stoppedDeploymentIds = activeList.filter((d) => d.deploymentStopped && !GONE.has(d.status) && !IN_PROGRESS.has(d.status)).map((d) => d.id);
+  const ids = { liveDeploymentIds, stoppedDeploymentIds };
 
   if (running.length) {
     const degraded =
       !!latest && (latest.status === "FAILED" || latest.status === "CRASHED") && !running.some((d) => d.id === latest.id);
-    return { health: "live", degraded, liveDeploymentIds };
+    return { health: "live", degraded, ...ids };
   }
   if (activeList.some((d) => d.status === "SLEEPING" && !d.deploymentStopped)) {
-    return { health: "sleeping", degraded: false, liveDeploymentIds };
+    return { health: "sleeping", degraded: false, ...ids };
   }
-  if (latest && IN_PROGRESS.has(latest.status)) return { health: "deploying", degraded: false, liveDeploymentIds };
+  if (latest && IN_PROGRESS.has(latest.status)) return { health: "deploying", degraded: false, ...ids };
   if (latest?.status === "CRASHED" || activeList.some((d) => d.status === "CRASHED")) {
-    return { health: "crashed", degraded: false, liveDeploymentIds };
+    return { health: "crashed", degraded: false, ...ids };
   }
-  if (latest?.status === "FAILED") return { health: "failed", degraded: false, liveDeploymentIds };
-  return { health: "offline", degraded: false, liveDeploymentIds };
+  if (latest?.status === "FAILED") return { health: "failed", degraded: false, ...ids };
+  return { health: "offline", degraded: false, ...ids };
 }
 
 export type HealthCounts = Record<Health, number> & { degraded: number; total: number };

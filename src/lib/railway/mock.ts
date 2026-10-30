@@ -155,6 +155,8 @@ type SvcSpec = {
   sleep?: boolean;
   cron?: string;
   replicas?: number;
+  /** Railway's 2025 runtime migration left the newest deployment marked stopped but still active: it bills memory, serves nothing. */
+  stoppedButBilled?: boolean;
 };
 type EnvSpec = {
   name: string;
@@ -226,6 +228,14 @@ const SPEC: ProjSpec[] = [
     name: "steadfast-fascination",
     ageDays: 45,
     envs: [{ name: "production", services: [{ name: "status", repo: "acme/status", history: ["SUCCESS", "REMOVED"], rates: { cpu: 0.0008, mem: 0.02, egressPerDay: 0.01 }, domain: "status.acme.dev" }] }],
+  },
+  {
+    // Railway stopped it during its runtime migration but kept it on the active list, so memory still bills.
+    ws: "personal",
+    name: "chart-archive",
+    description: "Old chart renderer",
+    ageDays: 480,
+    envs: [{ name: "production", services: [{ name: "charts", repo: "acme/charts", history: ["SUCCESS", "REMOVED", "REMOVED"], stoppedButBilled: true, rates: { mem: 0.11 } }] }],
   },
   {
     ws: "personal",
@@ -359,7 +369,7 @@ function buildWorld(): World {
         const instanceSeed = `${spec.name}/${envSpec.name}/${svc.name}`;
         const r = rng(instanceSeed);
         // Deployment history, newest first
-        let cursor = now - (2 + r() * 30) * HOUR;
+        let cursor = svc.stoppedButBilled ? now - (130 + r() * 30) * DAY : now - (2 + r() * 30) * HOUR;
         const deployments: MDeployment[] = svc.history.map((status, index) => {
           const createdAt = cursor;
           cursor -= (0.6 + r() * 3.5) * DAY;
@@ -380,11 +390,12 @@ function buildWorld(): World {
             status,
             createdAt: new Date(createdAt).toISOString(),
             updatedAt: new Date(createdAt + 3 * MINUTE).toISOString(),
-            deploymentStopped: status === "REMOVED" || status === "FAILED",
+            deploymentStopped: status === "REMOVED" || status === "FAILED" || (!!svc.stoppedButBilled && index === 0),
             meta,
             creator: svc.image ? null : { name: "Demo Developer", email: "dev@example.com" },
             staticUrl: status === "SUCCESS" ? `${svc.name}-${envSpec.name}-${hash32(instanceSeed).toString(36).slice(0, 4)}.up.railway.app` : null,
           };
+          if (svc.stoppedButBilled && index === 0) d.meta = { ...meta, reason: "migrate" };
           if (status === "BUILDING") d.settleAt = now + 45_000;
           return d;
         });
@@ -419,7 +430,8 @@ function buildWorld(): World {
           deployments,
           activeIds: active ? [active.id] : [],
           baseRates,
-          rates: running ? baseRates : ZERO_RATES,
+          // A stopped-but-active deployment bills memory only.
+          rates: running ? (svc.stoppedButBilled ? { ...ZERO_RATES, mem: baseRates.mem } : baseRates) : ZERO_RATES,
           ratesSince: since,
           accrued,
           accruedSpan,

@@ -1,6 +1,7 @@
 import type { ExecutionItemResult, PlanFlag } from "./plan-types";
 
-export type BulkMode = "on" | "off";
+/** on: redeploy offline services · off: remove live deployments · stopped: remove deployments Railway stopped but still bills. */
+export type BulkMode = "on" | "off" | "stopped";
 
 /** What the browser sends. The server re-reads Railway before anything is approved. */
 export type BulkTargetInput = {

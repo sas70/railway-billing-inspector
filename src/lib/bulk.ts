@@ -47,7 +47,7 @@ function isAmbiguous(error: unknown) {
 function parseTargets(input: unknown): { mode: BulkMode; targets: BulkTargetInput[] } {
   if (!input || typeof input !== "object") throw new UserFacingError("Invalid request.");
   const raw = input as Record<string, unknown>;
-  if (raw.mode !== "on" && raw.mode !== "off") throw new UserFacingError("Invalid bulk action.");
+  if (raw.mode !== "on" && raw.mode !== "off" && raw.mode !== "stopped") throw new UserFacingError("Invalid bulk action.");
   if (!Array.isArray(raw.targets) || raw.targets.length === 0) throw new UserFacingError("Nothing selected.");
   if (raw.targets.length > MAX_SERVICES) throw new UserFacingError(`Select at most ${MAX_SERVICES} services at a time.`);
 
@@ -106,6 +106,35 @@ async function reviewOff(target: BulkTargetInput): Promise<BulkPlanItem[]> {
       willRun: true,
       reviewedLive: true,
       status: instance.latestDeployment?.status,
+    }),
+  );
+}
+
+/** Deployments Railway marked stopped but still lists as active (and can still bill for memory). */
+async function reviewStopped(target: BulkTargetInput): Promise<BulkPlanItem[]> {
+  const account = getAccount(target.accountKey);
+  if (!account) {
+    return [skipped(target, "deployment.remove", "—", "Unknown account.")];
+  }
+  const project = await loadProject(account, target.projectId);
+  if (isProtectedProject(project)) {
+    return [skipped(target, "deployment.remove", "—", `${project.name} is listed in PROTECTED_PROJECTS.`)];
+  }
+  if (!workspaceAllowed(account, project.workspace?.id)) {
+    return [skipped(target, "deployment.remove", "—", "Outside this token's workspace.")];
+  }
+  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId);
+  const stopped = instance.healthInfo.stoppedDeploymentIds;
+  if (stopped.length === 0) {
+    return [skipped(target, "deployment.remove", "—", "Nothing stopped is still listed as active.")];
+  }
+  return stopped.map((deploymentId) =>
+    item(target, account.label, {
+      targetId: deploymentId,
+      kind: "deployment.remove",
+      willRun: true,
+      reviewedLive: false,
+      status: instance.activeDeployments.find((d) => d.id === deploymentId)?.status,
     }),
   );
 }
@@ -205,25 +234,32 @@ export async function createBulkPlan(input: unknown): Promise<BulkPlanView> {
   const items: BulkPlanItem[] = [];
   for (const target of targets) {
     try {
-      items.push(...(mode === "off" ? await reviewOff(target) : await reviewOn(target)));
+      items.push(...(mode === "off" ? await reviewOff(target) : mode === "stopped" ? await reviewStopped(target) : await reviewOn(target)));
     } catch (error) {
-      items.push(skipped(target, mode === "off" ? "deployment.remove" : "deployment.redeploy", "—", friendlyError(error)));
+      items.push(skipped(target, mode === "on" ? "deployment.redeploy" : "deployment.remove", "—", friendlyError(error)));
     }
   }
 
   const runnableCount = items.filter((i) => i.willRun).length;
   const projects = new Set(items.filter((i) => i.willRun).map((i) => i.projectId)).size;
-  const phrase = mode === "off" ? `TURN OFF ${runnableCount} SERVICES` : `TURN ON ${runnableCount} SERVICES`;
+  const phrase =
+    mode === "off" ? `TURN OFF ${runnableCount} SERVICES` : mode === "stopped" ? `REMOVE ${runnableCount} STOPPED` : `TURN ON ${runnableCount} SERVICES`;
   const expiresAtMs = Date.now() + PLAN_TTL_MS;
 
   const view: BulkPlanView = {
     id: randomUUID(),
     mode,
-    title: mode === "off" ? "Turn all projects off" : "Turn all projects on",
-    verb: mode === "off" ? "Turn off" : "Turn on",
+    title: mode === "off" ? "Turn all projects off" : mode === "stopped" ? "Remove stopped deployments that still bill" : "Turn all projects on",
+    verb: mode === "off" ? "Turn off" : mode === "stopped" ? "Remove" : "Turn on",
     destructive: true,
     impact:
-      mode === "off"
+      mode === "stopped"
+        ? [
+            `Remove ${runnableCount} deployment${runnableCount === 1 ? "" : "s"} across ${projects} project${projects === 1 ? "" : "s"} that Railway marked stopped but still lists as active (Railway deployment.remove).`,
+            "Nothing is serving traffic from these. Railway can keep billing memory for them anyway (most were created by its 2025 runtime migration), so removing them should end that charge. Check the bill summary a day later.",
+            "Service settings, variables, domains and volumes are not touched. Each one is re-checked immediately before it runs.",
+          ]
+        : mode === "off"
         ? [
             `Take ${runnableCount} live service${runnableCount === 1 ? "" : "s"} offline across ${projects} project${projects === 1 ? "" : "s"} (Railway deployment.remove).`,
             "Those GraphQL mutations are not a billed Railway product. Stopping compute stops new usage charges; usage already incurred this period stays on the invoice.",
@@ -235,7 +271,7 @@ export async function createBulkPlan(input: unknown): Promise<BulkPlanView> {
             "Each service is one API mutation, run one after another, and each is re-checked immediately before it runs.",
           ],
     recovery:
-      mode === "off"
+      mode === "off" || mode === "stopped"
         ? "Turn a service back on from this table (redeploy). Data on volumes is kept; in-memory state is lost."
         : "Turn a service off again from this table if you did not mean to start it.",
     items,
@@ -329,6 +365,7 @@ export async function executeBulkPlan(planId: unknown, typedPhrase: unknown): Pr
         } else if (row.kind === "deployment.remove") {
           if (GONE.has(d.status)) skipReason = "Already removed.";
           else if (IN_PROGRESS.has(d.status)) skipReason = "Still building/deploying.";
+          else if (stored.view.mode === "stopped" && !d.deploymentStopped) skipReason = "It's running again, so it was left alone.";
         } else if (IN_PROGRESS.has(d.status) || !d.canRedeploy) {
           skipReason = "Railway says this deployment can't be redeployed right now.";
         }
