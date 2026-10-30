@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Search index.** Search now answers from an index kept on your machine, built in the background the first time the dashboard opens and updated once a day (or with **Update**). Keyword search covers project details, summaries, READMEs and code, ranked by relevance, and **topic search** finds projects about the same subject even when the words differ, using a small embedding model that runs locally. Each result says why it matched. Repos that exist only on GitHub are copied once into `data/search-index/repos`, so their code is searchable without GitHub's rate limits. Regex and match-case searches still run live. Run `npm install` after updating.
+- **Nothing is re-read until you press Refresh.** Railway reads no longer expire after an hour: they are saved on disk (`data/railway-cache.sqlite`, git-ignored) and reused across restarts until you press Refresh or make a change from the dashboard. READMEs, local clones and summary checks are also kept until Refresh. Railway reads slower than 3 seconds are logged in the terminal.
+
 ## 0.2.0 (October 2026)
 
 **Find what you're paying for with nothing running.**

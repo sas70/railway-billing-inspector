@@ -1,28 +1,34 @@
 import "server-only";
 
+import { mkdirSync } from "node:fs";
+import path from "node:path";
+
 import { isMockMode, type AccountConfig } from "../config";
 import type { GqlDoc } from "./documents";
 import { RailwayApiError, type RailwayErrorKind } from "./errors";
 import { mockRequest } from "./mock";
+import { SavedReads } from "./saved-reads";
 
 export { RailwayApiError, errorMessage } from "./errors";
 
 export const RAILWAY_ENDPOINT = "https://backboard.railway.com/graphql/v2";
 
 /**
- * Reads are kept until Refresh (or a change made from this app) clears them, so moving between
- * tabs never re-reads Railway. The hour is only a backstop for a dashboard left open overnight.
+ * Reads are kept until you press Refresh (or make a change from this app), with no time limit.
+ * They live in memory and in data/railway-cache.sqlite, so a server restart doesn't re-read
+ * Railway either. The "Updated … ago" label next to Refresh says how old they are.
  */
-export const QUERY_TTL_MS = 60 * 60_000;
 /** Railway allows 10 req/s on Hobby; keep well under it per token. */
 const MAX_IN_FLIGHT_PER_ACCOUNT = 4;
 const REQUEST_TIMEOUT_MS = 30_000;
+/** Railway reads slower than this are logged to the terminal. */
+const SLOW_MS = 3_000;
 /** Honour Retry-After automatically only when the wait is short. */
 const MAX_AUTO_RETRY_WAIT_S = 10;
 
 export type RateInfo = { limit?: number; remaining?: number; reset?: string; updatedAt: number };
 
-type CacheEntry = { expires: number; fetchedAt: number; data: unknown };
+type CacheEntry = { fetchedAt: number; data: unknown };
 type Limiter = { active: number; queue: (() => void)[] };
 
 // Module state lives on globalThis so it survives hot reloads in `next dev`.
@@ -32,6 +38,7 @@ const store = globalThis as typeof globalThis & {
   __rbiRate?: Map<string, RateInfo>;
   __rbiLimiters?: Map<string, Limiter>;
   __rbiGeneration?: { value: number };
+  __rbiSaved?: SavedReads | null;
 };
 const cache = (store.__rbiCache ??= new Map<string, CacheEntry>());
 const inflight = (store.__rbiInflight ??= new Map<string, Promise<unknown>>());
@@ -39,6 +46,41 @@ const rateInfo = (store.__rbiRate ??= new Map<string, RateInfo>());
 const limiters = (store.__rbiLimiters ??= new Map<string, Limiter>());
 /** Bumped on every clear, so a read that was already in flight can't put old data back. */
 const generation = (store.__rbiGeneration ??= { value: 0 });
+
+/** The on-disk copy. Off in demo mode and on Vercel (read-only file system); then memory only. */
+function saved(): SavedReads | null {
+  if (store.__rbiSaved !== undefined) return store.__rbiSaved;
+  if (isMockMode() || process.env.VERCEL === "1") return (store.__rbiSaved = null);
+  try {
+    const dir = process.env.AUDIT_LOG_DIR?.trim() || path.join(/*turbopackIgnore: true*/ process.cwd(), "data");
+    mkdirSync(dir, { recursive: true });
+    store.__rbiSaved = new SavedReads(path.join(dir, "railway-cache.sqlite"));
+  } catch (error) {
+    console.warn("[railway] Saved reads are off (memory only):", error instanceof Error ? error.message : error);
+    store.__rbiSaved = null;
+  }
+  return store.__rbiSaved;
+}
+
+function readSaved(key: string): CacheEntry | null {
+  const hit = cache.get(key);
+  if (hit) return hit;
+  try {
+    const disk = saved()?.get(key);
+    if (disk) {
+      cache.set(key, disk);
+      return disk;
+    }
+  } catch {}
+  return null;
+}
+
+function writeSaved(key: string, account: string, entry: CacheEntry) {
+  cache.set(key, entry);
+  try {
+    saved()?.set(key, account, entry.data, entry.fetchedAt);
+  } catch {}
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -91,6 +133,9 @@ export function getRateInfo(accountKey: string): RateInfo | undefined {
 
 export function clearCache(accountKey?: string) {
   generation.value++;
+  try {
+    saved()?.clear(accountKey);
+  } catch {}
   if (!accountKey) {
     cache.clear();
     inflight.clear();
@@ -100,14 +145,14 @@ export function clearCache(accountKey?: string) {
   for (const key of inflight.keys()) if (key.startsWith(`${accountKey}|`)) inflight.delete(key);
 }
 
-/** When the oldest cached read was fetched (ms since epoch), or null when nothing is cached. */
+/** When the oldest saved read was fetched (ms since epoch), or null when nothing is saved. */
 export function oldestCachedAt(): number | null {
-  const now = Date.now();
+  try {
+    const disk = saved()?.oldest();
+    if (disk != null) return disk;
+  } catch {}
   let oldest: number | null = null;
-  for (const entry of cache.values()) {
-    if (entry.expires <= now) continue;
-    if (oldest == null || entry.fetchedAt < oldest) oldest = entry.fetchedAt;
-  }
+  for (const entry of cache.values()) if (oldest == null || entry.fetchedAt < oldest) oldest = entry.fetchedAt;
   return oldest;
 }
 
@@ -220,7 +265,8 @@ async function execute<T>(account: AccountConfig, doc: GqlDoc, variables: Record
 
 /**
  * Send one GraphQL operation to Railway with the account's token.
- * - Queries: cached until Refresh, at most an hour (per account + variables), de-duplicated while in flight.
+ * - Queries: saved until Refresh, with no time limit (per account + variables, in memory and on disk),
+ *   de-duplicated while in flight.
  * - Mutations: never cached; a mutation clears that account's cache.
  * - Any `errors` entry throws — Railway reports auth failures as HTTP 200 + errors.
  */
@@ -242,19 +288,21 @@ export async function railwayRequest<T>(
 
   const cacheKey = `${account.key}|${doc.name}|${stableStringify(variables)}`;
   if (!opts.fresh) {
-    const hit = cache.get(cacheKey);
-    if (hit && hit.expires > Date.now()) return hit.data as T;
+    const hit = readSaved(cacheKey);
+    if (hit) return hit.data as T;
     const pending = inflight.get(cacheKey);
     if (pending) return pending as Promise<T>;
   }
 
   const startedIn = generation.value;
+  const queuedAt = Date.now();
   const promise = withSlot(account.key, () => execute<T>(account, doc, variables))
     .then((data) => {
-      if (generation.value === startedIn) {
-        const now = Date.now();
-        cache.set(cacheKey, { expires: now + QUERY_TTL_MS, fetchedAt: now, data });
-      }
+      const took = Date.now() - queuedAt;
+      // Shown in the terminal running the dashboard, to spot what makes a page slow.
+      if (took > SLOW_MS) console.info(`[railway] ${doc.name} for ${account.label} took ${(took / 1000).toFixed(1)} s (including waiting for a free slot)`);
+      // Live reads (logs) aren't saved; everything else is kept until Refresh.
+      if (generation.value === startedIn && !opts.fresh) writeSaved(cacheKey, account.key, { fetchedAt: Date.now(), data });
       return data;
     })
     .finally(() => {

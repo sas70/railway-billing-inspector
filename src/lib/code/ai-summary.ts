@@ -34,7 +34,9 @@ export const AiSummarySchema = z.object({
   features: z.array(z.string()).describe("Up to 6 things the app actually does, from the code"),
   services: z.array(z.string()).describe("External APIs and services it calls, e.g. ['OpenAI', 'Stripe', 'Firestore']"),
   entrypoint: z.string().describe("How it starts in production, e.g. 'gunicorn app:app' or 'next start'"),
-  keywords: z.array(z.string()).describe("Up to 10 search keywords someone might use to find this app"),
+  keywords: z
+    .array(z.string())
+    .describe("Up to 10 search keywords someone might use to find this app, including its subject area (e.g. 'image segmentation', 'bank reconciliation', 'speech translation')"),
 });
 export type AiSummary = z.infer<typeof AiSummarySchema>;
 
@@ -150,7 +152,7 @@ const sameFingerprint = (a: Fingerprint, b: Fingerprint) => a.commit === b.commi
 
 const statusCache = new Map<string, { at: number; status: SummaryStatus | null }>();
 
-/** Stored summary + whether the code has changed since. Cached for a minute. */
+/** Stored summary + whether the code has changed since. Kept until Refresh (see clearSummaryStatusCache). */
 export async function summaryStatus(repo: string): Promise<SummaryStatus | null> {
   if (isMockMode()) {
     const stored = mockStored(repo);
@@ -158,7 +160,7 @@ export async function summaryStatus(repo: string): Promise<SummaryStatus | null>
   }
   const key = repoKey(repo);
   const cached = statusCache.get(key);
-  if (cached && Date.now() - cached.at < 60_000) return cached.status;
+  if (cached) return cached.status;
   let status: SummaryStatus | null = null;
   try {
     const t = await target(repo);
@@ -170,6 +172,11 @@ export async function summaryStatus(repo: string): Promise<SummaryStatus | null>
   } catch {}
   statusCache.set(key, { at: Date.now(), status });
   return status;
+}
+
+/** Re-check every repo's code against its summary on the next read (the Refresh button). */
+export function clearSummaryStatusCache() {
+  statusCache.clear();
 }
 
 export async function summaryStatuses(repos: string[]): Promise<Map<string, SummaryStatus>> {

@@ -10,15 +10,19 @@
     "start": "next start -H 127.0.0.1 -p 3100",
     "app": "next build && next start -H 127.0.0.1 -p 3100",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node --test scripts/test-cost-history.mjs scripts/test-project-description.mjs scripts/test-worth-a-look.mjs scripts/test-name-suggest.mjs scripts/test-preload.mjs",
+    "test": "node --test scripts/test-cost-history.mjs scripts/test-project-description.mjs scripts/test-worth-a-look.mjs scripts/test-name-suggest.mjs scripts/test-preload.mjs scripts/test-search-index.mjs scripts/test-saved-reads.mjs",
     "test:cost-history": "node --test scripts/test-cost-history.mjs",
     "test:descriptions": "node --test scripts/test-project-description.mjs",
     "test:worth-a-look": "node --test scripts/test-worth-a-look.mjs",
-    "test:names": "node --test scripts/test-name-suggest.mjs scripts/test-preload.mjs",
+    "test:names": "node --test scripts/test-name-suggest.mjs",
+    "test:preload": "node --test scripts/test-preload.mjs",
+    "test:index": "node --test scripts/test-search-index.mjs",
+    "test:saved-reads": "node --test scripts/test-saved-reads.mjs",
     "check:queries": "node scripts/check-queries.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
+    "better-sqlite3": "^12.11.1",
     "next": "16.3.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -26,6 +30,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -35,5 +40,8 @@
   },
   "engines": {
     "node": ">=20.9.0"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^3.8.1"
   }
 }

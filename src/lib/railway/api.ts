@@ -415,11 +415,23 @@ function aggregateUsage(result: T.WorkspaceUsageResult, period: Period | null, w
  * Metered usage for a workspace, grouped by project → service (→ environment).
  * `period` omitted = Railway's current billing period for the workspace.
  */
+/**
+ * Accounts whose workspaces Railway refused per-environment grouping for ("This usage query is
+ * too broad"). Remembered so later reads go straight to the grouping that works, instead of
+ * asking Railway again (and spending the hourly budget) on every page.
+ */
+const environmentGroupingRefused = ((globalThis as typeof globalThis & { __rbiNoEnvGrouping?: Set<string> }).__rbiNoEnvGrouping ??= new Set<string>());
+
 export async function loadWorkspaceUsage(account: AccountConfig, workspaceId: string, period?: Period): Promise<UsageView> {
   const base: Record<string, unknown> = { workspaceId, measurements: [...USAGE_MEASUREMENTS] };
   if (period) {
     base.startDate = period.start;
     base.endDate = period.end;
+  }
+  const refusedKey = `${account.key}|${workspaceId}`;
+  if (environmentGroupingRefused.has(refusedKey)) {
+    const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, { ...base, groupBy: ["PROJECT_ID", "SERVICE_ID"] });
+    return aggregateUsage(result, period ?? null, false);
   }
   try {
     const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, {
@@ -430,6 +442,7 @@ export async function loadWorkspaceUsage(account: AccountConfig, workspaceId: st
   } catch (error) {
     // Some grouping combinations may be refused; fall back to the CLI's grouping.
     if (error instanceof RailwayApiError && ["auth", "rate_limit", "network", "not_found"].includes(error.kind)) throw error;
+    environmentGroupingRefused.add(refusedKey);
     const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, {
       ...base,
       groupBy: ["PROJECT_ID", "SERVICE_ID"],

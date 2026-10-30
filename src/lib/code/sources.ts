@@ -12,7 +12,8 @@ import { isMockMode } from "../config";
  * Where each project's code lives: a local clone (found under CODE_LOCAL_ROOTS) or GitHub.
  *
  * Everything here is read-only. Local clones are only read (`git ls-files`/`git grep` and
- * file reads); GitHub is only sent GET requests. Nothing is cloned, fetched or written.
+ * file reads); GitHub is only sent GET requests. (The search index keeps its own read-only copies
+ * of GitHub-only repos in data/search-index/repos; see lib/search-index/repo-cache.ts.)
  */
 
 export const run = promisify(execFile);
@@ -98,8 +99,14 @@ async function findClones(root: string, depth: number, out: LocalClone[]) {
 
 let cloneCache: { at: number; clones: LocalClone[] } | null = null;
 
+/** Look for new or moved clones on the next read (the Refresh button). */
+export function clearCloneCache() {
+  cloneCache = null;
+}
+
+/** Clones under CODE_LOCAL_ROOTS, found once and kept until Refresh. */
 export async function localClones(): Promise<LocalClone[]> {
-  if (cloneCache && Date.now() - cloneCache.at < 60_000) return cloneCache.clones;
+  if (cloneCache) return cloneCache.clones;
   const clones: LocalClone[] = [];
   for (const root of localRoots()) await findClones(root, 2, clones);
   cloneCache = { at: Date.now(), clones };

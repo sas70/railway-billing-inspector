@@ -15,6 +15,8 @@ import type { RenameExecutionView, RenamePlanView } from "@/lib/rename-types";
 import { friendlyError, loadDeployment, loadLogs, loadProject } from "@/lib/railway/api";
 import { clearCache } from "@/lib/railway/client";
 import type { LogLine } from "@/lib/railway/types";
+import type { IndexJob } from "@/lib/search-index/build";
+import type { IndexStats } from "@/lib/search-index/store";
 
 /*
  * Server Functions are reachable by direct POST, so each one validates its input
@@ -115,9 +117,21 @@ export async function fetchLogsAction(accountKey: unknown, deploymentId: unknown
   }
 }
 
-/** Drop cached Railway responses; the client then calls router.refresh(). */
+/**
+ * The Refresh button: forget every saved Railway read (in memory and on disk) and what was read
+ * from local clones and GitHub, so the next render reads everything again. The client then calls
+ * router.refresh().
+ */
 export async function refreshDataAction(): Promise<void> {
   clearCache();
+  const [{ clearRepoInfoCache }, { clearSummaryStatusCache }, { clearCloneCache }] = await Promise.all([
+    import("@/lib/code"),
+    import("@/lib/code/ai-summary"),
+    import("@/lib/code/sources"),
+  ]);
+  clearRepoInfoCache();
+  clearSummaryStatusCache();
+  clearCloneCache();
 }
 
 export async function getWriteModeAction(): Promise<ActionResult<{ writeMode: boolean }>> {
@@ -169,6 +183,30 @@ export async function startSummariesAction(mode: unknown): Promise<ActionResult<
       });
     }
     return { ok: true, data: { started: startSummaryJob(todo, mode === "all"), count: todo.length } };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/**
+ * Build or update the local search index in the background. "update" re-reads only what changed;
+ * "rebuild" starts from scratch (downloaded GitHub copies are kept). Railway and GitHub are only read.
+ */
+export async function startIndexAction(mode: unknown): Promise<ActionResult<{ started: boolean }>> {
+  try {
+    if (mode !== "update" && mode !== "rebuild") throw new UserFacingError("Unknown index mode.");
+    const { startIndexJob } = await import("@/lib/search-index/build");
+    return { ok: true, data: { started: startIndexJob(mode) } };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** Progress of the search index job, for the status line while it runs. */
+export async function indexStatusAction(): Promise<ActionResult<{ job: IndexJob; stats: IndexStats }>> {
+  try {
+    const [{ indexJob }, { indexStats }] = await Promise.all([import("@/lib/search-index/build"), import("@/lib/search-index/store")]);
+    return { ok: true, data: { job: indexJob(), stats: indexStats() } };
   } catch (error) {
     return { ok: false, error: toMessage(error) };
   }

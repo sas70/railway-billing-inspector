@@ -4,6 +4,7 @@ import { connection } from "next/server";
 
 import { buttonClass } from "@/components/button";
 import { DescribeButton } from "@/components/DescribeSummaries";
+import { IndexStatus } from "@/components/IndexStatus";
 import { Icon } from "@/components/Icon";
 import { SetupGuide } from "@/components/SetupGuide";
 import { SummaryControls } from "@/components/SummaryControls";
@@ -17,6 +18,11 @@ import { plural } from "@/lib/format";
 import { isReadOnly } from "@/lib/write-mode";
 import { isOnlineHealth, needsAttention } from "@/lib/health";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type ProjectSummary } from "@/lib/railway/api";
+import { ensureIndex, indexJob } from "@/lib/search-index/build";
+import { embeddingsDisabledReason } from "@/lib/search-index/embed";
+import { searchIndex, type IndexSearch, type Snippet } from "@/lib/search-index/query";
+import { indexStats } from "@/lib/search-index/store";
+import { wordForms } from "@/lib/search-index/text";
 
 export const metadata: Metadata = { title: "Search" };
 
@@ -66,6 +72,7 @@ function Highlight({ text, o }: { text: string; o: Pick<SearchOptions, "query" |
 function SourceBadge({ info }: { info: RepoInfo | undefined }) {
   if (!info) return null;
   const s = info.source;
+  if (s.kind === "local" && s.matchedBy === "copy") return <Badge title={`Copy downloaded from GitHub by the search index: ${s.dir}`}>GitHub copy</Badge>;
   if (s.kind === "local") return <Badge title={`${s.dir}${s.matchedBy === "folder" ? " (matched by folder name)" : ""}`}>local</Badge>;
   if (s.kind === "github") return <Badge tone="info">GitHub</Badge>;
   if (s.kind === "mock") return <Badge tone="info">demo</Badge>;
@@ -95,6 +102,7 @@ export default async function SearchPage({ searchParams }: Props) {
 
   const accounts = await loadAccountViews();
   if (accounts.length === 0) return <SetupGuide />;
+  ensureIndex();
   const bundles = await Promise.all(uniqueWorkspaceTargets(accounts).map(({ account, workspace }) => loadWorkspaceBundle(account, workspace)));
 
   const workspaces = bundles.map((b) => b.workspace);
@@ -138,6 +146,14 @@ export default async function SearchPage({ searchParams }: Props) {
   for (const e of entries) for (const r of e.project.repos) projectsByRepo.set(repoKey(r), [...(projectsByRepo.get(repoKey(r)) ?? []), e]);
   const infoOf = (repo: string): Info | undefined => infos.get(repoKey(repo));
 
+  const stats = indexStats();
+  const liveOnly = o.regex || o.caseSensitive || one(sp.mode) === "live";
+  const useIndex = !!query && !liveOnly && stats.projects > 0;
+  const indexed: IndexSearch | null = useIndex
+    ? await searchIndex({ query, kinds: scopes, pathFilter: o.pathFilter, projectIds: new Set(entries.map((e) => e.project.id)) })
+    : null;
+  const entryById = new Map(entries.map((e) => [e.project.id, e]));
+
   const matcher = query ? makeMatcher(o) : null;
   const haystack = (e: Entry) =>
     [
@@ -160,7 +176,7 @@ export default async function SearchPage({ searchParams }: Props) {
       }),
     ].join("\n");
   const projectHits =
-    query && scopes.has("projects") && !matcher?.error
+    query && !useIndex && scopes.has("projects") && !matcher?.error
       ? entries.filter((e) => {
           const hay = haystack(e);
           if (o.regex) return matcher!.test(hay.replace(/\n/g, " ")) >= 0;
@@ -170,13 +186,13 @@ export default async function SearchPage({ searchParams }: Props) {
       : [];
 
   const readmeHits =
-    query && scopes.has("readme") && !matcher?.error
+    query && !useIndex && scopes.has("readme") && !matcher?.error
       ? repos
           .map((repo) => ({ repo, info: infoOf(repo), lines: infoOf(repo)?.readme ? matchingLines(infoOf(repo)!.readme!.text, matcher!.test, 3) : [] }))
           .filter((r) => r.lines.length > 0)
       : [];
 
-  const code = query && scopes.has("code") ? await searchCode(repos, o) : null;
+  const code = query && !useIndex && scopes.has("code") ? await searchCode(repos, o) : null;
   const codeMatches = code?.results.reduce((n, r) => n + r.matches.length, 0) ?? 0;
 
   const qs = (extra: Record<string, string>) => {
@@ -192,7 +208,7 @@ export default async function SearchPage({ searchParams }: Props) {
     <div className="space-y-6">
       <PageTitle
         title="Search"
-        subtitle="Find a project by what it does, not by the name Railway gave it. Searches project names, services, domains and repos, each repo's README, and the code itself — read-only, from your local clones or GitHub."
+        subtitle="Find a project by what it does, not by the name Railway gave it. Searches project names, services, domains and repos, each repo's summary and README, and the code itself, from a search index kept on this machine. Topic search also finds projects about the same subject when the words differ."
       />
 
       <Card className="p-5">
@@ -286,6 +302,8 @@ export default async function SearchPage({ searchParams }: Props) {
         </form>
       </Card>
 
+      <IndexStatus job={indexJob()} stats={stats} topicNote={stats.topics > 0 ? null : embeddingsDisabledReason()} />
+
       <SourcesNotice setup={setup} unreadable={unreadable.length} withoutRepo={projectsWithoutRepo} />
 
       {matcher?.error && <Notice tone="error" title="Can't run that search">{matcher.error}</Notice>}
@@ -299,6 +317,8 @@ export default async function SearchPage({ searchParams }: Props) {
           describe={summarized > 0 ? { readOnly } : null}
           demo={isMockMode()}
         />
+      ) : indexed ? (
+        <IndexedResults result={indexed} entryById={entryById} infoOf={infoOf} projectsByRepo={projectsByRepo} demo={isMockMode()} liveHref={qs({ mode: "live" })} />
       ) : (
         <>
           <p className="text-sm text-ink-2" role="status">
@@ -309,7 +329,15 @@ export default async function SearchPage({ searchParams }: Props) {
             ]
               .filter(Boolean)
               .join(" · ")}{" "}
-            for “{query}”
+            for “{query}”, searched live
+            {stats.projects > 0 && (
+              <>
+                {" "}·{" "}
+                <Link href={qs({ mode: "", regex: "", case: "" })} className="link text-xs">
+                  {liveOnly && (o.regex || o.caseSensitive) ? "Back to index search (regex and match case off)" : "Back to index search"}
+                </Link>
+              </>
+            )}
           </p>
 
           {scopes.has("projects") && (
@@ -425,7 +453,7 @@ function SourcesNotice({ setup, unreadable, withoutRepo }: { setup: Awaited<Retu
         : [
             unreadable > 0 && `${plural(unreadable, "repo")} can't be read with the current sources.`,
             withoutRepo > 0 && `${plural(withoutRepo, "project")} deploy from images or templates, not a GitHub repo — only their names, services and domains are searchable.`,
-            "Nothing is cloned, pulled or changed.",
+            "Repos and clones are only read; repos that are only on GitHub are copied into this app's data folder for the search index.",
           ]
             .filter(Boolean)
             .join(" ")}
@@ -578,5 +606,178 @@ function Catalog({
       />
       {entries.length === 0 ? <EmptyState>No projects match these filters.</EmptyState> : <ProjectList entries={entries} infoOf={infoOf} />}
     </Card>
+  );
+}
+
+/** Wrap each search term in <mark>, case-insensitively (for index results, where terms can be stemmed or prefixes). */
+function TermHighlight({ text, terms }: { text: string; terms: string[] }) {
+  const words = [...new Set(terms.flatMap((t) => t.split(/\s+/)).filter((w) => w.length > 1).flatMap(wordForms))].sort((a, b) => b.length - a.length);
+  if (!text || words.length === 0) return <>{text}</>;
+  // A stem like "invoic" marks the whole word it starts ("invoices").
+  const re = new RegExp(`((?:${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})[\\p{L}\\p{N}]*)`, "giu");
+  return (
+    <>
+      {text.split(re).map((part, i) =>
+        i % 2 === 1 ? (
+          <mark key={i} className="rounded-sm bg-(--warning-wash) text-ink">
+            {part}
+          </mark>
+        ) : (
+          part
+        ),
+      )}
+    </>
+  );
+}
+
+const SNIPPET_LABEL: Record<Snippet["kind"], string> = { project: "Project details", summary: "Summary", readme: "README", code: "Code" };
+
+function snippetUrl(s: Snippet, demo: boolean): string | null {
+  if (demo || !s.repo || !s.path) return null;
+  return `https://github.com/${s.repo}/blob/HEAD/${s.path.split("/").map(encodeURIComponent).join("/")}${s.line ? `#L${s.line}` : ""}`;
+}
+
+function IndexedResults({
+  result,
+  entryById,
+  infoOf,
+  projectsByRepo,
+  demo,
+  liveHref,
+}: {
+  result: IndexSearch;
+  entryById: Map<string, Entry>;
+  infoOf: (r: string) => Info | undefined;
+  projectsByRepo: Map<string, Entry[]>;
+  demo: boolean;
+  liveHref: string;
+}) {
+  const codeMatches = result.code.reduce((n, r) => n + r.matches.length, 0);
+  return (
+    <>
+      <p className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-ink-2" role="status">
+        <span>
+          {plural(result.projects.length, "project")} · {plural(codeMatches, "code match", "code matches")} in {plural(result.code.length, "repo")}, from the index in {result.ms} ms
+        </span>
+        <Link href={liveHref} className="link text-xs">
+          Search the code live instead
+        </Link>
+      </p>
+      {result.topicNote && <Notice tone="info">{result.topicNote} Keyword search still works.</Notice>}
+
+      <Card className="overflow-hidden">
+        <CardHeader
+          title={<span className="flex items-center gap-2">Best matches <Badge>{result.projects.length}</Badge></span>}
+          subtitle="Projects whose details, summary, README or code contain your words, plus projects about the same topic even when the words differ."
+        />
+        {result.projects.length === 0 ? (
+          <EmptyState>No project matches. Try fewer or broader words.</EmptyState>
+        ) : (
+          <ul className="divide-y divide-line">
+            {result.projects.map((hit) => {
+              const entry = entryById.get(hit.id);
+              return (
+                <li key={hit.id} className="grid gap-x-6 gap-y-2 px-5 py-3.5 md:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
+                  <div className="min-w-0">
+                    <Link href={hit.href} className="font-medium hover:underline underline-offset-2">
+                      <TermHighlight text={hit.name} terms={result.terms} />
+                    </Link>
+                    <div className="text-xs text-ink-2">{hit.workspace}</div>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {hit.topic != null && (
+                        <Badge tone="info" title="How close this project's summary and README are in meaning to your search, compared on this machine">
+                          Topic match {Math.round(hit.topic * 100)}%
+                        </Badge>
+                      )}
+                      {hit.keyword && (
+                        <Badge title={`Found in: ${hit.keyword.kinds.map((k) => SNIPPET_LABEL[k]).join(", ")}`}>
+                          {hit.keyword.matched === hit.keyword.of ? (hit.keyword.of === 1 ? "Word match" : `All ${hit.keyword.of} words`) : `${hit.keyword.matched} of ${hit.keyword.of} words`}
+                        </Badge>
+                      )}
+                    </div>
+                    {entry && entry.project.repos.length > 0 && (
+                      <div className="mt-1.5 space-y-0.5">
+                        {entry.project.repos.map((r) => (
+                          <div key={r} className="flex flex-wrap items-center gap-1.5">
+                            <RepoLink repo={r} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0 space-y-2">
+                    {entry && <About entry={entry} infoOf={infoOf} />}
+                    {hit.snippets.length > 0 && (
+                      <ul className="space-y-1">
+                        {hit.snippets.map((s, i) => {
+                          const url = snippetUrl(s, demo);
+                          const where = s.kind === "code" || (s.kind === "readme" && s.path) ? `${s.path}${s.line ? `:${s.line}` : ""}` : SNIPPET_LABEL[s.kind];
+                          return (
+                            <li key={i} className="overflow-hidden rounded-md bg-surface-2 text-xs">
+                              <div className="px-3 pt-1.5 text-ink-2">
+                                {url ? (
+                                  <a href={url} target="_blank" rel="noreferrer" className="link font-mono">
+                                    {where}
+                                  </a>
+                                ) : (
+                                  <span className={s.kind === "code" ? "font-mono" : ""}>{where}</span>
+                                )}
+                              </div>
+                              <p className={`overflow-x-auto px-3 pb-1.5 pt-0.5 leading-relaxed text-ink ${s.kind === "code" ? "whitespace-pre font-mono text-[11px]" : ""}`}>
+                                <TermHighlight text={s.text} terms={result.terms} />
+                              </p>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Card>
+
+      {result.code.length > 0 && (
+        <Card className="overflow-hidden">
+          <CardHeader
+            title={<span className="flex items-center gap-2">Code <Badge>{codeMatches}</Badge></span>}
+            subtitle="Places in the code where all your words appear close together (within the same 50 lines). For exact text, regular expressions or matching case, search the code live."
+          />
+          <ul className="divide-y divide-line">
+            {result.code.map((r) => (
+              <li key={r.repo} className="px-5 py-3">
+                <RepoHeader repo={r.repo} info={infoOf(r.repo)} projects={projectsByRepo.get(repoKey(r.repo)) ?? []} />
+                <ul className="mt-2 space-y-1">
+                  {r.matches.map((m, i) => {
+                    const url = snippetUrl({ kind: "code", repo: r.repo, path: m.path, line: m.line, text: "" }, demo);
+                    return (
+                      <li key={`${m.path}:${m.line}:${i}`} className="overflow-hidden rounded-md bg-surface-2 text-xs">
+                        <div className="px-3 pt-1.5 text-ink-2">
+                          {url ? (
+                            <a href={url} target="_blank" rel="noreferrer" className="link font-mono">
+                              {m.path}:{m.line}
+                            </a>
+                          ) : (
+                            <span className="font-mono">
+                              {m.path}:{m.line}
+                            </span>
+                          )}
+                        </div>
+                        <pre className="overflow-x-auto whitespace-pre px-3 pb-1.5 pt-0.5 font-mono text-[11px] leading-relaxed text-ink">
+                          <TermHighlight text={m.text} terms={result.terms} />
+                        </pre>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {r.more && <p className="mt-1 text-xs text-ink-2">More matches in this repo — narrow with “File path contains”.</p>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+    </>
   );
 }
