@@ -16,7 +16,7 @@
 
 <p align="center">
   <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-2f7a63">
-  <img alt="Version 0.2.0" src="https://img.shields.io/badge/version-0.2.0-2a78d6">
+  <img alt="Version 0.3.0" src="https://img.shields.io/badge/version-0.3.0-2a78d6">
   <img alt="Runs on your machine" src="https://img.shields.io/badge/runs-on%20your%20machine-1e2b24">
 </p>
 
