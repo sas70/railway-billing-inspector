@@ -109,6 +109,7 @@ export default async function ServicePage({ params, searchParams }: Props) {
   const lockReason = readOnly ? "Read-only — enable Write mode in the header" : locked ? "This project is protected (PROTECTED_PROJECTS)" : undefined;
   const destructiveLock = lockReason;
   const activeIds = new Set(instance?.healthInfo.liveDeploymentIds ?? []);
+  const stoppedIds = new Set(instance?.healthInfo.stoppedDeploymentIds ?? []);
   const selfHref = (extra: Record<string, string>) => {
     const q = new URLSearchParams({ env: env.id, range, n: String(limit), ...extra });
     return `${projectHref}/s/${service.id}?${q.toString()}`;
@@ -130,6 +131,7 @@ export default async function ServicePage({ params, searchParams }: Props) {
           reason: meta.reason,
           image: meta.image,
           isLive: activeIds.has(d.id),
+          stillBilled: stoppedIds.has(d.id),
           canRedeploy: d.canRedeploy,
           canRollback: d.canRollback,
         };
@@ -307,6 +309,29 @@ export default async function ServicePage({ params, searchParams }: Props) {
                   );
                 })}
               </ul>
+            )}
+            {stoppedIds.size > 0 && (
+              <div className="mt-4">
+                <Notice tone="warning" title="Stopped, but Railway still lists it as active">
+                  <p>
+                    Railway marked {stoppedIds.size === 1 ? "this deployment" : `${stoppedIds.size} deployments`} stopped (
+                    {[...stoppedIds].map(shortId).join(", ")}), but still keeps {stoppedIds.size === 1 ? "it" : "them"} on
+                    the active list. Nothing is serving traffic, yet Railway can keep billing the memory. Most of these
+                    came from its 2025 runtime migration. Removing {stoppedIds.size === 1 ? "it" : "them"} should end the
+                    charge; check the bill summary a day later.
+                  </p>
+                  <div className="mt-2">
+                    <ActionButton
+                      label={stoppedIds.size === 1 ? "Remove stopped deployment" : `Remove ${stoppedIds.size} stopped deployments`}
+                      icon="trash"
+                      tone="danger"
+                      disabled={!!destructiveLock}
+                      disabledReason={destructiveLock}
+                      request={{ accountKey: account.key, kind: "deployment.remove", ...ids, targetIds: [...stoppedIds] }}
+                    />
+                  </div>
+                </Notice>
+              </div>
             )}
           </div>
         </Card>

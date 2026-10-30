@@ -193,10 +193,13 @@ async function draftDeploymentPlan(account: AccountConfig, req: PlanRequest, pro
 
   const instance = await loadServiceInstance(account, env.id, service.id, { fresh: true });
   const activeIds = new Set(instance.activeDeployments.filter((d) => !d.deploymentStopped).map((d) => d.id));
+  // Stopped by Railway but still listed as active: these can keep billing memory.
+  const stoppedIds = new Set(instance.healthInfo.stoppedDeploymentIds);
 
   const items: PlanItem[] = [];
   const reviewedLive: Record<string, boolean> = {};
   let liveSelected = 0;
+  let stoppedSelected = 0;
 
   for (const targetId of targetIds) {
     let deployment: DeploymentReviewNode;
@@ -218,6 +221,7 @@ async function draftDeploymentPlan(account: AccountConfig, req: PlanRequest, pro
     const isLive = activeIds.has(deployment.id);
     const flags: PlanFlag[] = [];
     if (isLive) flags.push({ tone: req.kind === "deployment.remove" ? "danger" : "info", text: "Live — serving now" });
+    if (stoppedIds.has(deployment.id)) flags.push({ tone: "warning", text: "Stopped, but still listed as active" });
     if (deployment.status === "CRASHED") flags.push({ tone: "warning", text: "Crashed" });
 
     const gate = gateDeployment(req.kind, deployment, isLive);
@@ -225,6 +229,7 @@ async function draftDeploymentPlan(account: AccountConfig, req: PlanRequest, pro
     if (gate.ok) {
       reviewedLive[deployment.id] = isLive;
       if (isLive) liveSelected++;
+      if (stoppedIds.has(deployment.id)) stoppedSelected++;
     }
   }
 
@@ -248,7 +253,12 @@ async function draftDeploymentPlan(account: AccountConfig, req: PlanRequest, pro
           impact.push(`Attached volume ${volumes.map((v) => `${v.volume.name} (${sizeMB(v.currentSizeMB)})`).join(", ")} is kept and keeps billing for storage.`);
         }
       }
-      const idle = runnable - liveSelected;
+      if (stoppedSelected > 0) {
+        impact.push(
+          `${plural(stoppedSelected, "deployment")} that Railway marked stopped but still lists as active will be removed. Railway can keep billing memory for these, so removing them should end that charge; check the bill summary a day later.`,
+        );
+      }
+      const idle = runnable - liveSelected - stoppedSelected;
       if (idle > 0) impact.push(`${plural(idle, "deployment")} not serving traffic will be cleaned up — no effect on cost.`);
       impact.push("Service settings, variables and domains are not touched.");
       return {

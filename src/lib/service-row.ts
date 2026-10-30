@@ -19,6 +19,8 @@ export type ServiceCatalogRow = {
   degraded: boolean;
   online: boolean;
   liveDeploymentIds: string[];
+  /** Stopped by Railway but still listed as active, and possibly still billed. */
+  stoppedDeploymentIds: string[];
   latestId: string | null;
   latestAt: string | null;
   latestLabel: string;
