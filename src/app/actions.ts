@@ -46,9 +46,9 @@ export async function createBulkPlanAction(request: unknown): Promise<ActionResu
   }
 }
 
-export async function executeBulkPlanAction(planId: unknown, phrase: unknown): Promise<ActionResult<BulkExecutionView>> {
+export async function executeBulkPlanAction(planId: unknown, phrase: unknown, selectedKeys?: unknown): Promise<ActionResult<BulkExecutionView>> {
   try {
-    return { ok: true, data: await executeBulkPlan(planId, phrase) };
+    return { ok: true, data: await executeBulkPlan(planId, phrase, selectedKeys) };
   } catch (error) {
     return { ok: false, error: toMessage(error) };
   }

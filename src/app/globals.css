@@ -211,6 +211,15 @@ button:not(:disabled), summary {
   }
 }
 
+/* Something is costing money right now: a soft pulsing ring that draws the eye without moving the layout. */
+@keyframes attention-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--status-warning) 55%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in oklab, var(--status-warning) 0%, transparent); }
+}
+.attention-pulse {
+  animation: attention-pulse 1.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

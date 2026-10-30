@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { createBulkPlanAction, executeBulkPlanAction } from "@/app/actions";
-import type { BulkExecutionView, BulkMode, BulkPlanView, BulkTargetInput } from "@/lib/bulk-types";
+import { bulkPhrase, type BulkExecutionView, type BulkMode, type BulkPlanView, type BulkTargetInput } from "@/lib/bulk-types";
 import { money, plural } from "@/lib/format";
 import type { ServiceCatalogRow } from "@/lib/service-row";
 import { buttonClass } from "./button";
@@ -25,7 +25,16 @@ function targetsFrom(rows: ServiceCatalogRow[]): BulkTargetInput[] {
   }));
 }
 
-export function BulkMasterButtons({ rows, readOnly }: { rows: ServiceCatalogRow[]; readOnly: boolean }) {
+export function BulkMasterButtons({
+  rows,
+  readOnly,
+  highlightStopped = false,
+}: {
+  rows: ServiceCatalogRow[];
+  readOnly: boolean;
+  /** Draw attention to "Remove stopped" (the list is filtered to those services). */
+  highlightStopped?: boolean;
+}) {
   const [flow, setFlow] = useState<{ mode: BulkMode; visible: ServiceCatalogRow[]; candidates: ServiceCatalogRow[] } | null>(null);
   const eligibleOn = rows.filter((r) => !r.online && !r.protected);
   const eligibleOff = rows.filter((r) => r.online && !r.protected && r.liveDeploymentIds.length > 0 && r.health !== "deploying");
@@ -65,7 +74,7 @@ export function BulkMasterButtons({ rows, readOnly }: { rows: ServiceCatalogRow[
       {eligibleStopped.length > 0 && (
         <button
           type="button"
-          className={buttonClass("neutral", "sm")}
+          className={`${buttonClass(highlightStopped ? "danger" : "neutral", "sm")} ${highlightStopped && !lock ? "attention-pulse" : ""}`}
           disabled={!!lock}
           title={
             lock ??
@@ -215,6 +224,8 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
     | { name: "done"; plan: BulkPlanView; result: BulkExecutionView }
   >({ name: "loading" });
   const [typed, setTyped] = useState("");
+  // Items unticked in the review; everything that can run starts ticked.
+  const [excluded, setExcluded] = useState<Set<string>>(new Set());
   const [attempt, setAttempt] = useState(0);
   const didChange = useRef(false);
 
@@ -227,6 +238,7 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
     let cancelled = false;
     setPhase({ name: "loading" });
     setTyped("");
+    setExcluded(new Set());
     createBulkPlanAction({ mode, targets }).then(
       (res) => {
         if (!cancelled) setPhase(res.ok ? { name: "review", plan: res.data } : { name: "error", message: res.error });
@@ -244,8 +256,22 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
 
   const running = phase.name === "running";
   const plan = phase.name === "review" || phase.name === "running" || phase.name === "done" ? phase.plan : null;
-  const phraseOk = !plan?.requiresPhrase || typed.trim() === plan.phrase;
-  const canApprove = phase.name === "review" && !!plan && !plan.blockedReason && plan.runnableCount > 0 && phraseOk;
+  const runnableKeys = plan ? plan.items.filter((i) => i.willRun).map((i) => i.key) : [];
+  const selectedKeys = runnableKeys.filter((k) => !excluded.has(k));
+  const selectedCount = selectedKeys.length;
+  const phrase = plan ? bulkPhrase(plan.mode, selectedCount) : "";
+  const phraseOk = !plan?.requiresPhrase || typed.trim().replace(/\s+/g, " ") === phrase;
+  const canApprove = phase.name === "review" && !!plan && !plan.blockedReason && selectedCount > 0 && phraseOk;
+  const allTicked = selectedCount === runnableKeys.length && runnableKeys.length > 0;
+
+  function toggleItem(key: string) {
+    setExcluded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   function handleClosed() {
     onClose();
@@ -255,7 +281,7 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
   async function approve(next: BulkPlanView) {
     setPhase({ name: "running", plan: next });
     try {
-      const res = await executeBulkPlanAction(next.id, typed);
+      const res = await executeBulkPlanAction(next.id, typed, selectedKeys);
       if (res.ok) {
         didChange.current = res.data.succeeded + res.data.failed + res.data.unknown > 0;
         setPhase({ name: "done", plan: next, result: res.data });
@@ -313,18 +339,52 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
                 </p>
               )}
               <section>
-                <h3 className="font-semibold">
-                  Items ({plan.runnableCount} of {plan.items.length} will run)
-                </h3>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold">
+                    Items ({selectedCount} of {plan.items.length} will run)
+                  </h3>
+                  {runnableKeys.length > 1 && (
+                    <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium">
+                      <input
+                        type="checkbox"
+                        className="size-4 accent-[var(--series-1)]"
+                        checked={allTicked}
+                        ref={(el) => {
+                          if (el) el.indeterminate = selectedCount > 0 && !allTicked;
+                        }}
+                        disabled={running}
+                        onChange={() => setExcluded(allTicked ? new Set(runnableKeys) : new Set())}
+                      />
+                      Select all
+                    </label>
+                  )}
+                </div>
+                <p className="mt-0.5 text-xs text-ink-2">Untick anything you want to leave as it is.</p>
                 <ul className="mt-1.5 divide-y divide-[var(--border)] rounded-lg border border-line">
                   {plan.items.map((item) => (
                     <li key={item.key} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2">
-                      <div className="min-w-0">
-                        <div className="font-medium break-words">{item.label}</div>
-                        {item.detail && <div className="text-xs text-ink-2">{item.detail}</div>}
-                      </div>
-                      <div className="shrink-0 text-right text-xs">
+                      <label className={`flex min-w-0 flex-1 items-start gap-2.5 ${item.willRun ? "cursor-pointer" : ""}`}>
                         {item.willRun ? (
+                          <input
+                            type="checkbox"
+                            className="mt-0.5 size-4 shrink-0 accent-[var(--series-1)]"
+                            checked={!excluded.has(item.key)}
+                            disabled={running}
+                            onChange={() => toggleItem(item.key)}
+                            aria-label={`Include ${item.label}`}
+                          />
+                        ) : (
+                          <span className="size-4 shrink-0" aria-hidden />
+                        )}
+                        <span className="min-w-0">
+                          <span className="block font-medium break-words">{item.label}</span>
+                          {item.detail && <span className="block text-xs text-ink-2">{item.detail}</span>}
+                        </span>
+                      </label>
+                      <div className="shrink-0 text-right text-xs">
+                        {item.willRun && excluded.has(item.key) ? (
+                          <div className="font-medium text-ink-2">left as is</div>
+                        ) : item.willRun ? (
                           <div className="inline-flex items-center gap-1 font-medium">
                             <Icon name="check" size={12} color="var(--status-good)" /> will run
                           </div>
@@ -344,7 +404,13 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
               {!plan.blockedReason && plan.runnableCount > 0 && (
                 <label className="block">
                   <span className="font-medium">
-                    To approve, type <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.95em]">{plan.phrase}</code>
+                    {selectedCount === 0 ? (
+                      "Tick at least one item to continue."
+                    ) : (
+                      <>
+                        To approve, type <code className="rounded bg-surface-2 px-1.5 py-0.5 font-mono text-[0.95em]">{phrase}</code>
+                      </>
+                    )}
                   </span>
                   <input
                     autoFocus
@@ -389,7 +455,7 @@ function BulkReviewDialog({ mode, targets, onClose }: { mode: BulkMode; targets:
                       <Icon name="loader" size={14} className="animate-spin" /> Working…
                     </>
                   ) : (
-                    `${plan.verb} ${plan.runnableCount}`
+                    `${plan.verb} ${selectedCount}`
                   )}
                 </button>
               )}

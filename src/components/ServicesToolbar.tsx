@@ -10,6 +10,7 @@ export function ServicesToolbar({
   filter,
   onQuery,
   onFilter,
+  stoppedCount = 0,
   visible,
   total,
   actions,
@@ -18,6 +19,8 @@ export function ServicesToolbar({
   filter: StatusFilter;
   onQuery: (query: string) => void;
   onFilter: (filter: StatusFilter) => void;
+  /** Services Railway stopped but still bills; the filter only shows when there are some. */
+  stoppedCount?: number;
   visible: number;
   total: number;
   actions?: React.ReactNode;
@@ -46,6 +49,7 @@ export function ServicesToolbar({
             ["all", "All"],
             ["online", "Online"],
             ["offline", "Offline"],
+            ...(stoppedCount > 0 || filter === "stopped" ? ([["stopped", `Stopped, still billing (${stoppedCount})`]] as const) : []),
           ] as const
         ).map(([id, label]) => (
           <button
@@ -53,8 +57,9 @@ export function ServicesToolbar({
             type="button"
             aria-pressed={filter === id}
             onClick={() => onFilter(id)}
-            className={`rounded-md px-3 py-1.5 font-medium ${filter === id ? "bg-surface text-ink shadow-sm" : "text-ink-2 hover:text-ink"}`}
+            className={`rounded-md px-3 py-1.5 font-medium ${filter === id ? "bg-surface text-ink shadow-sm" : id === "stopped" ? "text-[var(--status-warning-ink,var(--ink))] hover:text-ink" : "text-ink-2 hover:text-ink"}`}
           >
+            {id === "stopped" && <span className="mr-1.5 inline-block size-1.5 rounded-full bg-[var(--status-warning)] align-middle" aria-hidden />}
             {label}
           </button>
         ))}

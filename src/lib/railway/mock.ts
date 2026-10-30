@@ -238,6 +238,13 @@ const SPEC: ProjSpec[] = [
     envs: [{ name: "production", services: [{ name: "charts", repo: "acme/charts", history: ["SUCCESS", "REMOVED", "REMOVED"], stoppedButBilled: true, rates: { mem: 0.11 } }] }],
   },
   {
+    ws: "studio",
+    name: "pdf-splitter",
+    description: "PDF splitting tool",
+    ageDays: 420,
+    envs: [{ name: "production", services: [{ name: "web", repo: "acme/pdf-tools", history: ["SUCCESS", "REMOVED"], stoppedButBilled: true, rates: { mem: 0.11 } }] }],
+  },
+  {
     ws: "personal",
     name: "old-experiments",
     description: "Notebook sandbox",
