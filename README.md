@@ -97,3 +97,5 @@ Create the token at [railway.com/account/tokens](https://railway.com/account/tok
 - **[Changelog](CHANGELOG.md):** what's new in each version.
 - **[Roadmap](https://railway-billing-inspector.vercel.app/roadmap.html):** what's coming next. Vote, comment or suggest a feature.
 - **[License](LICENSE):** MIT.
+
+Made by [sas70](https://github.com/sas70).
