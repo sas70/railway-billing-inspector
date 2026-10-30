@@ -1,15 +1,18 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (October 2026)
 
+**Stop paying for deployments Railway already stopped.**
+
+- **Stopped, but still billed.** Railway can mark a deployment stopped yet keep it on the service's active list, and keep billing its memory (about 110 MB, roughly $0.035 a day each); most came from Railway's 2025 runtime migration. The dashboard now flags these on the Overview, in the deployment history, and on the service page, and removes them after the usual review: one at a time from the service page, or all at once with **Services → Remove stopped**.
 - **You can't miss it now.** When Railway is billing deployments it stopped, the Overview opens with a pop-up (once per visit) and a pulsing banner with the count and the cost per day. Both lead to **Services**, filtered to just those services, with **Remove stopped** highlighted.
 - **Pick what runs.** Every bulk review (turn on, turn off, remove stopped) now has a checkbox per item and **Select all**. Untick anything you want to leave alone; the phrase to type counts only what's ticked.
-- **Stopped, but still billed.** Railway can mark a deployment stopped yet keep it on the service's active list, and keep billing its memory (about 110 MB, roughly $0.035 a day each); most came from Railway's 2025 runtime migration. The dashboard now flags these on the Overview, in the deployment history, and on the service page, and removes them after the usual review: one at a time from the service page, or all at once with **Services → Remove stopped**.
+- **Search index.** Search now answers from an index kept on your machine, built in the background the first time the dashboard opens and updated once a day (or with **Update**). Keyword search covers project details, summaries, READMEs and code, ranked by relevance, and **topic search** finds projects about the same subject even when the words differ, using a small embedding model that runs locally. Each result says why it matched. Repos that exist only on GitHub are copied once into `data/search-index/repos`, so their code is searchable without GitHub's rate limits. Regex and match-case searches still run live. Run `npm install` after updating.
+- **Nothing is re-read until you press Refresh.** Railway reads no longer expire after an hour: they are saved on disk (`data/railway-cache.sqlite`, git-ignored) and reused across restarts until you press Refresh or make a change from the dashboard. READMEs, local clones and summary checks are also kept until Refresh. Railway reads slower than 3 seconds are logged in the terminal.
 - **A tour and a shorter README.** An interactive page at `/tour.html` (on the demo site too) with a four-panel comic, real findings, a feature explorer, the approval steps and a copy-and-paste quick start. The README is now a short, visual introduction; the full details moved to [docs/GUIDE.md](docs/GUIDE.md).
 - **Review dialogs read left to right again.** Opened from a table's right-aligned column, they inherited that alignment.
 
-- **Search index.** Search now answers from an index kept on your machine, built in the background the first time the dashboard opens and updated once a day (or with **Update**). Keyword search covers project details, summaries, READMEs and code, ranked by relevance, and **topic search** finds projects about the same subject even when the words differ, using a small embedding model that runs locally. Each result says why it matched. Repos that exist only on GitHub are copied once into `data/search-index/repos`, so their code is searchable without GitHub's rate limits. Regex and match-case searches still run live. Run `npm install` after updating.
-- **Nothing is re-read until you press Refresh.** Railway reads no longer expire after an hour: they are saved on disk (`data/railway-cache.sqlite`, git-ignored) and reused across restarts until you press Refresh or make a change from the dashboard. READMEs, local clones and summary checks are also kept until Refresh. Railway reads slower than 3 seconds are logged in the terminal.
+Upgrading: run `npm install` (the search index uses new packages), then `npm run app`.
 
 ## 0.2.0 (October 2026)
 
