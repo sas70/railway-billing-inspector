@@ -9,13 +9,16 @@ import { repoBlurbs } from "@/lib/code/blurbs";
 import { repoKey } from "@/lib/code/sources";
 import { isEnvReadOnly } from "@/lib/config";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
+import { isStatusFilter } from "@/lib/service-stats";
 import { serviceCatalog } from "@/lib/summaries";
 import { isReadOnly } from "@/lib/write-mode";
 
 export const metadata: Metadata = { title: "Services" };
 
-export default async function ServicesPage() {
+export default async function ServicesPage({ searchParams }: { searchParams: Promise<{ show?: string | string[] }> }) {
   await connection();
+  const { show } = await searchParams;
+  const initialFilter = typeof show === "string" && isStatusFilter(show) ? show : "all";
   const accounts = await loadAccountViews();
   if (accounts.length === 0) return <SetupGuide />;
 
@@ -67,7 +70,7 @@ export default async function ServicesPage() {
         </Notice>
       )}
 
-      <ServicesBoard rows={rows} readOnly={readOnly}>
+      <ServicesBoard rows={rows} readOnly={readOnly} initialFilter={initialFilter}>
         <ServicesTable rows={tableRows} readOnly={readOnly} />
       </ServicesBoard>
     </div>

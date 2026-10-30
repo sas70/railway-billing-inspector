@@ -14,14 +14,17 @@ import { matchServiceRow, serviceStats, type StatusFilter } from "@/lib/service-
 export function ServicesBoard({
   rows,
   readOnly,
+  initialFilter = "all",
   children,
 }: {
   rows: ServiceCatalogRow[];
   readOnly: boolean;
+  initialFilter?: StatusFilter;
   children: React.ReactNode;
 }) {
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<StatusFilter>("all");
+  const [filter, setFilter] = useState<StatusFilter>(initialFilter);
+  const stoppedCount = useMemo(() => rows.filter((r) => r.stoppedDeploymentIds.length > 0).length, [rows]);
   const q = query.trim().toLowerCase();
   const visible = useMemo(() => rows.filter((row) => matchServiceRow(row, q, filter)), [rows, q, filter]);
   const stats = serviceStats(visible);
@@ -31,12 +34,21 @@ export function ServicesBoard({
     const nodes = document.querySelectorAll<HTMLTableRowElement>("[data-service-row]");
     for (const node of nodes) {
       const online = node.dataset.online === "1";
+      const stopped = node.dataset.stopped === "1";
       const hay = node.dataset.search ?? "";
-      node.hidden = !((filter === "all" || (filter === "online") === online) && (!q || hay.includes(q)));
+      const statusOk = filter === "all" || (filter === "stopped" ? stopped : (filter === "online") === online);
+      node.hidden = !(statusOk && (!q || hay.includes(q)));
     }
   });
 
-  const scope = filter === "online" ? "online services" : filter === "offline" ? "offline services" : "visible services";
+  const scope =
+    filter === "online"
+      ? "online services"
+      : filter === "offline"
+        ? "offline services"
+        : filter === "stopped"
+          ? "stopped services Railway still bills"
+          : "visible services";
 
   return (
     <>
@@ -112,9 +124,10 @@ export function ServicesBoard({
           filter={filter}
           onQuery={setQuery}
           onFilter={setFilter}
+          stoppedCount={stoppedCount}
           visible={stats.count}
           total={rows.length}
-          actions={<BulkMasterButtons rows={visible} readOnly={readOnly} />}
+          actions={<BulkMasterButtons rows={visible} readOnly={readOnly} highlightStopped={filter === "stopped"} />}
         />
         <div hidden={filtered && stats.count === 0}>{children}</div>
         {filtered && stats.count === 0 && (

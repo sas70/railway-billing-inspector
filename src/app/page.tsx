@@ -10,6 +10,7 @@ import { ProjectLinks } from "@/components/ProjectLinks";
 import { ProjectRename } from "@/components/ProjectRename";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
+import { StoppedBillingAlert } from "@/components/StoppedBillingAlert";
 import { WorthALook } from "@/components/WorthALook";
 import {
   Badge,
@@ -34,7 +35,7 @@ import { isGeneratedRailwayName, projectNameHints } from "@/lib/project-name";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type WorkspaceBundle } from "@/lib/railway/api";
 import { ensureIndex } from "@/lib/search-index/build";
 import { blurbText, type RepoBlurb } from "@/lib/repo-blurb";
-import { billStructure, cleanupCandidates, projectCost, workspaceFigures } from "@/lib/summaries";
+import { billStructure, cleanupCandidates, projectCost, stoppedBillingSummary, workspaceFigures } from "@/lib/summaries";
 
 export const metadata: Metadata = { title: "Overview" };
 
@@ -71,6 +72,7 @@ export default async function OverviewPage() {
     }
   }
   const candidates = cleanupCandidates(bundles);
+  const stoppedBilling = stoppedBillingSummary(bundles);
   const workspaceCount = bundles.length;
   const randomNames = allProjects
     .filter((p) => !p.deletedAt && !isProtectedProject(p) && isGeneratedRailwayName(p.name, projectNameHints(p)))
@@ -112,6 +114,7 @@ export default async function OverviewPage() {
           </>
         }
       />
+      <StoppedBillingAlert summary={stoppedBilling} />
       <OverviewSearch totalProjects={projectCount} />
 
       {accounts

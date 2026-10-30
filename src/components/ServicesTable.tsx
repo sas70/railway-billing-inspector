@@ -115,6 +115,7 @@ export function ServicesTable({ rows, readOnly }: { rows: ServiceCatalogRow[]; r
                     key={row.key}
                     data-service-row
                     data-online={row.online ? "1" : "0"}
+                    data-stopped={row.stoppedDeploymentIds.length > 0 ? "1" : "0"}
                     data-search={search}
                     className="border-b border-line last:border-b-0 hover:bg-surface-2"
                   >

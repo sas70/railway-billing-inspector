@@ -281,6 +281,33 @@ export function billStructure(bundles: WorkspaceBundle[]): BillStructure {
 }
 
 /** The biggest part of a cost, as a lowercase phrase ("memory", "volume storage"). */
+/** Services whose deployment Railway marked stopped but still lists as active, so it can keep billing memory. */
+export type StoppedBilling = { services: number; projects: number; perDay: number | null; soFar: number };
+
+export function stoppedBillingSummary(bundles: WorkspaceBundle[]): StoppedBilling {
+  let services = 0;
+  let soFar = 0;
+  let perDay = 0;
+  let perDayKnown = true;
+  const projects = new Set<string>();
+  for (const bundle of bundles) {
+    if (!bundle.projects.ok) continue;
+    const figures = workspaceFigures(bundle);
+    for (const project of bundle.projects.value) {
+      if (project.deletedAt || isProtectedProject(project)) continue;
+      const count = project.environments.reduce((n, e) => n + e.instances.filter((i) => i.stoppedDeploymentIds.length > 0).length, 0);
+      if (count === 0) continue;
+      services += count;
+      projects.add(project.id);
+      soFar += figures.usageByProject.get(project.id)?.cost.total ?? 0;
+      const recent = bundle.recent?.ok ? bundle.recent.value[project.id] : undefined;
+      if (bundle.recent && !bundle.recent.ok) perDayKnown = false;
+      perDay += (recent?.total ?? 0) / RECENT_DAYS;
+    }
+  }
+  return { services, projects: projects.size, perDay: perDayKnown && bundles.some((b) => b.recent) ? perDay : null, soFar };
+}
+
 export function mainCostPart(cost: CostBreakdown): { key: keyof Omit<CostBreakdown, "total">; label: string } | null {
   let best: (typeof COST_PARTS)[number] | null = null;
   for (const part of COST_PARTS) if (cost[part.key] > 0 && (!best || cost[part.key] > cost[best.key])) best = part;

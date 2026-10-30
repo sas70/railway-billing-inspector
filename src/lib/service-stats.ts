@@ -1,6 +1,11 @@
 import type { ServiceCatalogRow } from "./service-row";
 
-export type StatusFilter = "all" | "online" | "offline";
+/** "stopped": Railway marked the deployment stopped but still lists it as active (and can bill its memory). */
+export type StatusFilter = "all" | "online" | "offline" | "stopped";
+
+export function isStatusFilter(value: unknown): value is StatusFilter {
+  return value === "all" || value === "online" || value === "offline" || value === "stopped";
+}
 export type ServiceSortKey = "service" | "status" | "environment" | "latest" | "period" | "expected";
 export type SortDir = "asc" | "desc";
 export type ServiceSort = { key: ServiceSortKey; dir: SortDir };
@@ -69,6 +74,7 @@ export function sortServiceRows(rows: ServiceCatalogRow[], sort: ServiceSort = D
 export function matchServiceRow(row: ServiceCatalogRow, query: string, filter: StatusFilter) {
   if (filter === "online" && !row.online) return false;
   if (filter === "offline" && row.online) return false;
+  if (filter === "stopped" && row.stoppedDeploymentIds.length === 0) return false;
   if (!query) return true;
   const hay = `${row.serviceName} ${row.projectName} ${row.workspaceName} ${row.environmentName}`.toLowerCase();
   return hay.includes(query);

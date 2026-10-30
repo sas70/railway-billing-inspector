@@ -3,6 +3,11 @@ import type { ExecutionItemResult, PlanFlag } from "./plan-types";
 /** on: redeploy offline services · off: remove live deployments · stopped: remove deployments Railway stopped but still bills. */
 export type BulkMode = "on" | "off" | "stopped";
 
+/** The phrase to type to approve `count` items. Shared so the review can update it as boxes are ticked. */
+export function bulkPhrase(mode: BulkMode, count: number): string {
+  return mode === "off" ? `TURN OFF ${count} SERVICES` : mode === "stopped" ? `REMOVE ${count} STOPPED` : `TURN ON ${count} SERVICES`;
+}
+
 /** What the browser sends. The server re-reads Railway before anything is approved. */
 export type BulkTargetInput = {
   accountKey: string;

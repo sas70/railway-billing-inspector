@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 
 import { appendAudit, type AuditEvent } from "./audit";
-import type { BulkExecutionView, BulkMode, BulkPlanItem, BulkPlanView, BulkTargetInput } from "./bulk-types";
+import { bulkPhrase, type BulkExecutionView, type BulkMode, type BulkPlanItem, type BulkPlanView, type BulkTargetInput } from "./bulk-types";
 import { getAccount, isMockMode, isProtectedProject, workspaceAllowed } from "./config";
 import { friendlyError, loadDeployment, loadDeployments, loadProject, loadServiceInstance } from "./railway/api";
 import { clearCache, railwayRequest } from "./railway/client";
@@ -242,8 +242,7 @@ export async function createBulkPlan(input: unknown): Promise<BulkPlanView> {
 
   const runnableCount = items.filter((i) => i.willRun).length;
   const projects = new Set(items.filter((i) => i.willRun).map((i) => i.projectId)).size;
-  const phrase =
-    mode === "off" ? `TURN OFF ${runnableCount} SERVICES` : mode === "stopped" ? `REMOVE ${runnableCount} STOPPED` : `TURN ON ${runnableCount} SERVICES`;
+  const phrase = bulkPhrase(mode, runnableCount);
   const expiresAtMs = Date.now() + PLAN_TTL_MS;
 
   const view: BulkPlanView = {
@@ -288,7 +287,11 @@ export async function createBulkPlan(input: unknown): Promise<BulkPlanView> {
   return view;
 }
 
-export async function executeBulkPlan(planId: unknown, typedPhrase: unknown): Promise<BulkExecutionView> {
+/**
+ * Runs an approved plan. `selectedKeys` (optional) limits it to the items ticked in the review; the phrase must then
+ * count only those. Items can only be left out, never added.
+ */
+export async function executeBulkPlan(planId: unknown, typedPhrase: unknown, selectedKeys?: unknown): Promise<BulkExecutionView> {
   prune();
   if (typeof planId !== "string" || !plans.has(planId)) {
     throw new UserFacingError("This review has expired or was already used. Close it and start again so the current state is re-checked.");
@@ -299,9 +302,21 @@ export async function executeBulkPlan(planId: unknown, typedPhrase: unknown): Pr
     throw new UserFacingError("This review expired (10 minutes). Start again so the current state is re-checked.");
   }
   if (stored.view.blockedReason) throw new UserFacingError(stored.view.blockedReason);
+  const allRunnable = stored.view.items.filter((i) => i.willRun);
+  let runnable = allRunnable;
+  if (selectedKeys !== undefined && selectedKeys !== null) {
+    if (!Array.isArray(selectedKeys) || selectedKeys.some((k) => typeof k !== "string")) throw new UserFacingError("Invalid selection.");
+    const picked = new Set(selectedKeys as string[]);
+    if (picked.size === 0) throw new UserFacingError("Tick at least one item to run.");
+    if ([...picked].some((k) => !allRunnable.some((i) => i.key === k))) {
+      throw new UserFacingError("The selection includes something that isn't in this review. Close it and start again.");
+    }
+    runnable = allRunnable.filter((i) => picked.has(i.key));
+  }
+  const expected = bulkPhrase(stored.view.mode, runnable.length);
   const typed = typeof typedPhrase === "string" ? normalizePhrase(typedPhrase) : "";
-  if (!stored.view.phrase || typed !== stored.view.phrase) {
-    throw new UserFacingError(`To approve, type ${stored.view.phrase} exactly.`);
+  if (!stored.view.phrase || typed !== expected) {
+    throw new UserFacingError(`To approve, type ${expected} exactly.`);
   }
 
   // Single use: claim the plan before the first await, so two requests that arrive together
@@ -311,7 +326,6 @@ export async function executeBulkPlan(planId: unknown, typedPhrase: unknown): Pr
 
   const results: ExecutionItemResult[] = [];
   let auditError: string | undefined;
-  const runnable = stored.view.items.filter((i) => i.willRun);
   let halt: string | undefined;
 
   const event = (row: BulkPlanItem, outcome: AuditEvent["outcome"], extra: Partial<AuditEvent> = {}): AuditEvent => ({
