@@ -114,8 +114,10 @@ Create the token at [railway.com/account/tokens](https://railway.com/account/tok
 ## Learn more
 
 - **[Full guide](docs/GUIDE.md):** every page, how approvals work, how the numbers are calculated, the search index, security, and the project layout.
+- **[Overview](docs/OVERVIEW.md):** one page on what it does, how changes stay safe, and the Railway actions it uses.
 - **[Changelog](CHANGELOG.md):** what's new in each version.
 - **[Roadmap](https://railway-billing-inspector.vercel.app/roadmap.html):** what's coming next. Vote, comment or suggest a feature.
+- **[Roadmap notes](docs/ROADMAP-NOTES.md):** what's being built, what's done since each release, and the design decisions behind it.
 - **[License](LICENSE):** MIT.
 
 Made by [sas70](https://github.com/sas70).
