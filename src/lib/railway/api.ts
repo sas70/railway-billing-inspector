@@ -16,7 +16,7 @@ import { normalizeRepo } from "../code/sources";
 import { getAccount, getAccounts, type AccountConfig } from "../config";
 import { emptyHealthCounts, instanceHealth, type Health, type HealthCounts } from "../health";
 import { instanceDomains, pickPublicDomains } from "../railway-links";
-import { RailwayApiError, errorMessage, railwayRequest } from "./client";
+import { RailwayApiError, errorMessage, railwayRequest, oldestCachedAt } from "./client";
 import * as D from "./documents";
 import type * as T from "./types";
 
@@ -524,7 +524,7 @@ export async function loadWorkspaceBundle(
 
 /** What each project was charged over the last RECENT_DAYS complete UTC days. */
 export async function loadRecentCosts(account: AccountConfig, workspaceId: string): Promise<Record<string, CostBreakdown>> {
-  const usage = await loadWorkspaceUsage(account, workspaceId, recentWindow());
+  const usage = await loadWorkspaceUsage(account, workspaceId, recentWindow(new Date(oldestCachedAt() ?? Date.now())));
   return Object.fromEntries(usage.projects.map((p) => [p.id, p.cost]));
 }
 
@@ -664,8 +664,9 @@ export async function loadServiceMetrics(
   range: MetricRange,
 ): Promise<ServiceMetricsView> {
   const spec = METRIC_RANGES[range];
-  // Round the window to the step so repeat views of the same chart hit the cache.
-  const end = Math.floor(Date.now() / 1000 / spec.step) * spec.step;
+  // Anchor rolling windows to the saved snapshot, even after a restart or browser reload.
+  // Refresh clears the snapshot so the next read advances the window.
+  const end = Math.floor((oldestCachedAt() ?? Date.now()) / 1000 / spec.step) * spec.step;
   const start = end - spec.seconds;
   const { metrics } = await railwayRequest<T.MetricsResult>(account, D.ServiceMetrics, {
     ...ids,

@@ -9,22 +9,19 @@ import Database from "better-sqlite3";
 
 export type SavedRead = { fetchedAt: number; data: unknown };
 
-/** Reads nobody has asked for in this long are dropped when the store opens (old time windows, deleted projects). */
-export const UNUSED_FOR_MS = 30 * 24 * 60 * 60_000;
 /** `used_at` is only rewritten when it is older than this, so reading doesn't mean writing every time. */
 const TOUCH_AFTER_MS = 24 * 60 * 60_000;
 
 export class SavedReads {
   private db: Database.Database;
 
-  constructor(file: string, now = Date.now()) {
+  constructor(file: string) {
     this.db = new Database(file);
     this.db.pragma("journal_mode = WAL");
     this.db.pragma("synchronous = NORMAL");
     this.db.exec(`CREATE TABLE IF NOT EXISTS reads (
       key TEXT PRIMARY KEY, account TEXT NOT NULL, fetched_at INTEGER NOT NULL, used_at INTEGER NOT NULL, data TEXT NOT NULL
     )`);
-    this.db.prepare("DELETE FROM reads WHERE used_at < ?").run(now - UNUSED_FOR_MS);
   }
 
   get(key: string, now = Date.now()): SavedRead | null {

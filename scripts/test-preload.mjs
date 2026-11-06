@@ -13,8 +13,8 @@ after(() => rmSync(output, { recursive: true, force: true }));
 execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "src/lib/preload.ts", "--outDir", output, "--module", "commonjs", "--target", "es2020", "--skipLibCheck", "--strict"], { stdio: "inherit" });
 const { KEEP_PAGES_SECONDS, PRELOAD_ROUTES, routesToPreload } = require(join(output, "preload.js"));
 
-test("preloads every main tab plus last billing period", () => {
-  for (const route of ["/", "/services", "/search", "/billing", "/billing?period=previous", "/audit"]) {
+test("preloads every dashboard tab and billing window", () => {
+  for (const route of ["/", "/services", "/search", "/billing", "/billing?period=previous", "/billing/history", "/billing/history?days=7", "/billing/history?days=30", "/rename", "/audit"]) {
     assert.ok(PRELOAD_ROUTES.includes(route), route);
   }
 });

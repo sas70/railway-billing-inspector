@@ -16,23 +16,23 @@ after(() => {
   rmSync(dbDir, { recursive: true, force: true });
 });
 execFileSync(process.execPath, [require.resolve("typescript/bin/tsc"), "src/lib/railway/saved-reads.ts", "--outDir", output, "--module", "commonjs", "--target", "es2022", "--skipLibCheck", "--strict", "--esModuleInterop"], { stdio: "inherit" });
-const { SavedReads, UNUSED_FOR_MS } = require(join(process.cwd(), output, "saved-reads.js"));
+const { SavedReads } = require(join(process.cwd(), output, "saved-reads.js"));
 
 const DAY = 24 * 60 * 60_000;
 
 test("a saved read comes back after the store is reopened (a server restart)", () => {
   const file = join(dbDir, "a.sqlite");
-  const first = new SavedReads(file, 1000);
+  const first = new SavedReads(file);
   first.set("main|Projects|{}", "main", { projects: [1, 2] }, 1000);
   first.close();
-  const again = new SavedReads(file, 2000);
+  const again = new SavedReads(file);
   assert.deepEqual(again.get("main|Projects|{}", 2000), { fetchedAt: 1000, data: { projects: [1, 2] } });
   assert.equal(again.oldest(), 1000);
   again.close();
 });
 
 test("there is no time limit: a read from a week ago is still used", () => {
-  const store = new SavedReads(join(dbDir, "b.sqlite"), 0);
+  const store = new SavedReads(join(dbDir, "b.sqlite"));
   store.set("k", "main", 42, 0);
   assert.equal(store.get("k", 7 * DAY).data, 42);
   store.close();
@@ -51,15 +51,15 @@ test("Refresh clears everything; a change clears only its account", () => {
   store.close();
 });
 
-test("reads nobody has used for a month are dropped when the store opens", () => {
+test("saved reads survive a year without visits until explicitly refreshed", () => {
   const file = join(dbDir, "d.sqlite");
-  const store = new SavedReads(file, 0);
+  const store = new SavedReads(file);
   store.set("old", "main", 1, 0);
   store.set("used", "main", 2, 0);
-  store.get("used", UNUSED_FOR_MS - DAY); // touched recently
+  store.get("used", 365 * DAY - DAY); // touched recently
   store.close();
-  const later = new SavedReads(file, UNUSED_FOR_MS + DAY);
-  assert.equal(later.get("old", UNUSED_FOR_MS + DAY), null);
-  assert.equal(later.get("used", UNUSED_FOR_MS + DAY).data, 2);
+  const later = new SavedReads(file);
+  assert.equal(later.get("old", 365 * DAY + DAY).data, 1);
+  assert.equal(later.get("used", 365 * DAY + DAY).data, 2);
   later.close();
 });

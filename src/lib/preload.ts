@@ -1,9 +1,9 @@
 /**
  * Pages read once in the background after the first page settles, so clicking a tab shows a copy
- * that's already here instead of "Reading from Railway…". Kept to the main tabs plus the one
- * switch people flip most (last billing period); project pages load the first time they're opened.
+ * that's already here instead of "Reading from Railway…". Includes every dashboard
+ * tab and billing window; project detail pages load when opened.
  */
-export const PRELOAD_ROUTES = ["/", "/services", "/search", "/billing", "/billing?period=previous", "/audit"] as const;
+export const PRELOAD_ROUTES = ["/", "/services", "/search", "/billing", "/billing?period=previous", "/billing/history", "/billing/history?days=7", "/billing/history?days=30", "/rename", "/audit"] as const;
 
 /**
  * How long the browser keeps a page it has shown or preloaded, in seconds: a week, so in practice

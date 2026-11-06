@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
     "*": ["node_modules/onnxruntime-node/**", "node_modules/onnxruntime-web/**", "node_modules/@huggingface/transformers/**"],
   },
   experimental: {
-    // Keep pages the browser has shown or preloaded for an hour, so switching tabs doesn't
+    // Keep pages the browser has shown or preloaded for a week, so switching tabs doesn't
     // re-render them. Refresh and every change made from the app throw these copies away.
     staleTimes: { dynamic: KEEP_PAGES_SECONDS, static: KEEP_PAGES_SECONDS },
   },

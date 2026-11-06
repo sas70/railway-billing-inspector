@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 import { getAccount, isEnvReadOnly, workspaceAllowed, WRITE_MODE_COOKIE } from "@/lib/config";
@@ -132,6 +133,7 @@ export async function refreshDataAction(): Promise<void> {
   clearRepoInfoCache();
   clearSummaryStatusCache();
   clearCloneCache();
+  revalidatePath("/", "layout");
 }
 
 export async function getWriteModeAction(): Promise<ActionResult<{ writeMode: boolean }>> {
