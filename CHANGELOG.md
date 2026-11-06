@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+**See what's behind every charge, and ask about it.**
+
+- **Ask about your projects.** A bubble at the bottom right of every page opens an assistant. At the top: four quick actions (Remove stopped deployments, Rename projects, Off but still charging, Needs attention). Below: ask in plain words, like "what's still charging me?" or a project's name, and get an answer from the dashboard's own data (projects, status, costs, recent charges, stopped deployments, summaries; never variables or tokens) with links to the right project or screen. With `ANTHROPIC_API_KEY`, Claude answers, only about your Railway projects and this dashboard; without it, and on the demo, built-in answers cover the common questions. It only links: every change still goes through its review. The conversation stays for the browser tab.
+- **Every number opens its list.** The Overview tiles are links: **Projects** jumps to the project tables, and **Live services**, **Needs attention** and **Offline / removed** open Services filtered to exactly what they count. A new yellow tile, **Off, but still charging**, shows how many projects with nothing running Railway charged in the last 2 days, the cost per day, and how many stopped deployments are ready to remove; it opens the full bill list. Services has a new **Needs attention** filter, and **Offline** now means nothing live and nothing broken, matching the tile. Filters can be linked to with `/services?show=online|attention|offline|stopped`.
+- **What's in that volume?** On a project page, each volume has a **What's in it?** panel: an instant guess from the attached image and mount path (Redis data, a PostgreSQL database, notebook files…), what it costs per day and month, and how to keep a copy. **Explain with Claude** reads the image, size, other services and the repo's code and writes a paragraph on what it most likely holds, labeled as an inference, since Railway can't list a volume's files. Saved under `data/volume-notes/`.
+- **Delete volume.** From the same panel, after a review that shows the size, the cost per day, what it most likely holds, whether a running service uses it, any Railway backups, Railway's 48-hour restore window and how to keep a copy first. Type the volume name to approve (Railway `volumeDelete`).
+- **Rename in one click.** Each row on **Rename projects** has a green check (or press Enter) that renames just that project, with the same fresh check, protected-project rule and audit log as the bulk review. **Select all** ticks every project that has a name ready.
+- **Summaries write themselves.** When the Overview opens, projects whose repo has no summary get one in the background (with `ANTHROPIC_API_KEY`); a status line shows progress. Each repo is tried once per start, and new summaries feed the rename suggestions.
+- **Smaller fixes.** The Next.js "N" badge no longer shows in `npm run dev`, and the stopped-but-billed pop-up doesn't cover the bill list when you go to it on purpose.
+
+**Safer changes**
+
 - Bulk turn-on rechecks service state immediately before execution and skips services already online or deploying. Bulk reviews fetch fresh project and service state.
 - Single-project rename skips names changed since review, matching bulk rename behavior.
 - Saved Railway reads are isolated by credential fingerprint, workspace scope, and query version. Existing cache entries are ignored by the new format.

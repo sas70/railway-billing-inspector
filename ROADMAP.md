@@ -16,21 +16,14 @@ Votes and comments live on GitHub issues, so everyone sees the same counts. You 
 
 ## Now: being built
 
-### AI assistant, step 1: guide
-
-Ask in plain words, like "which apps cost the most?" or "I want to summarize my apps", and get an answer or a link to the page that does it.
-
-- Answers from your dashboard's data: projects, costs, status and saved summaries.
-- Read-only: it can't change anything.
-
-## Next: planned
-
 ### AI assistant, step 2: propose and confirm
 
-The assistant drafts the change and shows the same review the buttons show today. Nothing runs until you click **Confirm**.
+Step 1 is out: the **Ask** bubble answers questions and links to the right screen. Next, the assistant drafts the change and shows the same review the buttons show today. Nothing runs until you click **Confirm**.
 
 - Write mode, protected projects and the re-check before each change all still apply.
 - Destructive actions still need their typed phrase, and every change goes in the audit log.
+
+## Next: planned
 
 ### Rotate secrets in one go
 
@@ -54,7 +47,23 @@ One request runs a whole chore, such as "summarize my new apps, copy the descrip
 
 ## Done
 
-**New in this release**
+**New since 0.3.0** (in `main`, not yet in a numbered release)
+
+- **Ask about your projects (assistant, step 1).** A bubble on every page with four quick actions (Remove stopped deployments, Rename projects, Off but still charging, Needs attention) and answers from your dashboard's data that link to the right screen. Read-only: it never changes anything.
+- **Every number opens its list.** The Overview tiles link to exactly what they count, and a new **Off, but still charging** tile shows the cost per day and the stopped deployments ready to remove.
+- **What's in that volume?** A best guess at what a billing volume holds, from its image, mount path and code, with Claude's explanation, and **Delete volume** after a review.
+- **Rename in one click.** A green check per row, plus **Select all**.
+- **Summaries write themselves.** Projects with no summary get one in the background when the Overview opens.
+- **Safer changes.** Fresh re-checks before bulk and rename actions, saved reads tied to each token, credential files kept out of the search index, and checks on every push.
+
+**In 0.3.0**
+
+- **Stopped, but still billed.** Railway can stop a deployment yet keep billing its memory. A pop-up and banner flag them, and **Remove stopped** clears them after a review, with a checkbox per item.
+- **Search index and topic search.** Search answers from an index on your machine, by keyword or by topic.
+- **Nothing re-read until Refresh.** What was read from Railway is saved on disk and reused until you press Refresh.
+- **A tour page and a short README.**
+
+**Already in the app**
 
 - **Off, but still charging.** Projects with nothing running that Railway actually charged in the last 2 days, with the cost per day and what it's for (CPU, memory, network or storage).
 - **Bill summary first.** Above the project list: what idle projects cost per day, this period's cost by status, and what they're charged for. The Billing page shows the same split for this and last period.
