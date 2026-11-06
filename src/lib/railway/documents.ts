@@ -540,6 +540,22 @@ mutation EnvironmentDelete($id: String!) {
   environmentDelete(id: $id)
 }`);
 
+export const VolumeDelete = m("VolumeDelete", /* GraphQL */ `
+mutation VolumeDelete($volumeId: String!) {
+  volumeDelete(volumeId: $volumeId)
+}`);
+
+export const VolumeInstanceBackupList = q("VolumeInstanceBackupList", /* GraphQL */ `
+query VolumeInstanceBackupList($volumeInstanceId: String!) {
+  volumeInstanceBackupList(volumeInstanceId: $volumeInstanceId) {
+    id
+    name
+    createdAt
+    expiresAt
+    usedMB
+  }
+}`);
+
 export const ProjectUpdate = m("ProjectUpdate", /* GraphQL */ `
 mutation ProjectUpdate($id: String!, $input: ProjectUpdateInput!) {
   projectUpdate(id: $id, input: $input) {

@@ -1242,6 +1242,19 @@ const HANDLERS: Record<string, Handler> = {
     throw notFound("Service", op);
   },
 
+  VolumeDelete: (w, v, op) => {
+    for (const project of w.projects) {
+      const vol = project.volumes.find((x) => x.volumeId === v.volumeId && !x.deletedAt);
+      if (!vol) continue;
+      vol.deletedAt = Date.now();
+      return { volumeDelete: true };
+    }
+    throw notFound("Volume", op);
+  },
+
+  // The demo has no backups; real Railway lists them per volume instance.
+  VolumeInstanceBackupList: () => ({ volumeInstanceBackupList: [] }),
+
   EnvironmentDelete: (w, v, op) => {
     for (const project of w.projects) {
       const env = project.envs.find((e) => e.id === v.id && !e.deleted);

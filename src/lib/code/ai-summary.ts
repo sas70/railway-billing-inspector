@@ -9,6 +9,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { isMockMode } from "../config";
+import { reposToAutoSummarize } from "./auto-summary";
 import { MOCK_SUMMARIES } from "./mock-corpus";
 import { cloneFor, githubGet, githubToken, localClones, mapLimit, repoKey, run } from "./sources";
 
@@ -241,6 +242,14 @@ async function codeContext(t: Target, commit: string): Promise<string> {
   return parts.join("\n");
 }
 
+/** The same code excerpt the summaries use (tree, README, manifests, entry points), or null if unreadable. */
+export async function repoCodeContext(repo: string): Promise<string | null> {
+  const t = await target(repo);
+  if (!t) return null;
+  const current = await fingerprint(t);
+  return codeContext(t, current.commit);
+}
+
 // ── Claude ──────────────────────────────────────────────────────────────────
 
 const SYSTEM = `You write short catalog entries for a developer's deployed apps. The developer has many apps on Railway with auto-generated names like "steadfast-fascination" and has forgotten which is which. From the repository contents, describe what the app actually does, judged by the code, not just the README (READMEs are often template boilerplate - say so only if the code really is just the template). Be concrete and plain: name the real inputs, outputs and services. No marketing language.`;
@@ -298,6 +307,26 @@ export type SummaryJob = {
 const job: SummaryJob = { running: false, startedAt: null, finishedAt: null, total: 0, done: 0, current: [], created: 0, updated: 0, fresh: 0, failed: [] };
 
 export const summaryJob = (): SummaryJob => ({ ...job, current: [...job.current], failed: [...job.failed] });
+
+const autoTried = new Set<string>();
+
+/**
+ * Summarize, in the background, every repo that has no saved summary yet. Cheap enough to call on
+ * every Overview load: it reads only the saved files, and each repo is tried once per server start.
+ * Returns how many it started. Never throws: summaries are a convenience.
+ */
+export async function ensureSummaries(repos: string[]): Promise<number> {
+  try {
+    if (!aiSummariesAvailable() || job.running || repos.length === 0) return 0;
+    const saved = await savedSummaries(repos);
+    const todo = reposToAutoSummarize(repos, new Set(saved.keys()), autoTried);
+    if (todo.length === 0) return 0;
+    for (const repo of todo) autoTried.add(repoKey(repo));
+    return startSummaryJob(todo) ? todo.length : 0;
+  } catch {
+    return 0;
+  }
+}
 
 /** Start summarizing in the background (one job at a time). Returns false if one is already running. */
 export function startSummaryJob(repos: string[], force = false): boolean {
