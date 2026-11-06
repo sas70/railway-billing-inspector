@@ -431,6 +431,15 @@ export default async function ProjectPage({ params, searchParams }: Props) {
                               disabledReason={v.isPendingDeletion ? "Railway already has it queued for deletion" : destructiveLock}
                               request={{ accountKey: account.key, kind: "volume.delete", projectId: project.id, environmentId: envView.id, targetIds: [v.volume.id] }}
                             />
+                            {(destructiveLock || v.isPendingDeletion) && (
+                              <p className="mt-2 max-w-52 text-xs text-ink-2">
+                                {v.isPendingDeletion
+                                  ? "Railway already has this volume queued for deletion."
+                                  : readOnly
+                                    ? "Enable Write mode in the top bar to delete this volume."
+                                    : "This project is protected, so its volumes cannot be deleted here."}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </details>
