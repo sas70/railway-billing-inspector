@@ -1,10 +1,27 @@
 import type { ServiceCatalogRow } from "./service-row";
 
-/** "stopped": Railway marked the deployment stopped but still lists it as active (and can bill its memory). */
-export type StatusFilter = "all" | "online" | "offline" | "stopped";
+/**
+ * online: live, sleeping or deploying · attention: crashed, failed or degraded · offline: nothing live and
+ * nothing broken (the Overview's "Offline / removed") · stopped: Railway marked the deployment stopped but
+ * still lists it as active (and can bill its memory).
+ */
+export type StatusFilter = "all" | "online" | "attention" | "offline" | "stopped";
+export type StatusTag = Exclude<StatusFilter, "all">;
+
+const STATUS_FILTERS: readonly StatusFilter[] = ["all", "online", "attention", "offline", "stopped"];
 
 export function isStatusFilter(value: unknown): value is StatusFilter {
-  return value === "all" || value === "online" || value === "offline" || value === "stopped";
+  return typeof value === "string" && (STATUS_FILTERS as readonly string[]).includes(value);
+}
+
+/** Which status filters a row belongs to. The same split the Overview tiles count. */
+export function rowStatusTags(row: Pick<ServiceCatalogRow, "online" | "health" | "degraded" | "stoppedDeploymentIds">): StatusTag[] {
+  const tags: StatusTag[] = [];
+  if (row.online) tags.push("online");
+  if (row.health === "crashed" || row.health === "failed" || row.degraded) tags.push("attention");
+  if (row.health === "offline") tags.push("offline");
+  if (row.stoppedDeploymentIds.length > 0) tags.push("stopped");
+  return tags;
 }
 export type ServiceSortKey = "service" | "status" | "environment" | "latest" | "period" | "expected";
 export type SortDir = "asc" | "desc";
@@ -72,9 +89,7 @@ export function sortServiceRows(rows: ServiceCatalogRow[], sort: ServiceSort = D
 }
 
 export function matchServiceRow(row: ServiceCatalogRow, query: string, filter: StatusFilter) {
-  if (filter === "online" && !row.online) return false;
-  if (filter === "offline" && row.online) return false;
-  if (filter === "stopped" && row.stoppedDeploymentIds.length === 0) return false;
+  if (filter !== "all" && !rowStatusTags(row).includes(filter)) return false;
   if (!query) return true;
   const hay = `${row.serviceName} ${row.projectName} ${row.workspaceName} ${row.environmentName}`.toLowerCase();
   return hay.includes(query);

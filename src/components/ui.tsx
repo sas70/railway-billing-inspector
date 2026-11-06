@@ -203,6 +203,10 @@ export function StatTile({
   icon,
   iconColor,
   chart,
+  href,
+  hint,
+  tone,
+  className = "",
 }: {
   label: string;
   value: React.ReactNode;
@@ -210,9 +214,16 @@ export function StatTile({
   icon?: IconName;
   iconColor?: string;
   chart?: React.ReactNode;
+  /** Makes the whole tile a link. A "#…" link stays on this page. */
+  href?: string;
+  /** Accessible description of where the link goes. */
+  hint?: string;
+  tone?: "warning";
+  className?: string;
 }) {
-  return (
-    <div className="panel min-w-0 rounded-xl border border-line bg-surface p-5">
+  const box = `panel min-w-0 rounded-xl border p-5 ${tone === "warning" ? "bg-[var(--warning-wash)]" : "border-line bg-surface"} ${className}`;
+  const style = tone === "warning" ? { borderColor: "color-mix(in oklab, var(--status-warning) 55%, transparent)" } : undefined;
+  const body = (
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-1.5 text-sm text-ink-2">
@@ -223,8 +234,20 @@ export function StatTile({
           {sub && <div className="mt-1.5 text-xs leading-relaxed text-ink-2">{sub}</div>}
         </div>
         {chart && <div className="mt-0.5 shrink-0">{chart}</div>}
+        {href && !chart && <Icon name="chevron" size={15} className="mt-1.5 shrink-0 text-ink-2 transition-transform group-hover:translate-x-0.5" />}
       </div>
-    </div>
+  );
+  if (!href) return <div className={box} style={style}>{body}</div>;
+  const linkClass = `${box} group block transition-colors hover:border-[var(--ink-3)] hover:shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2`;
+  // A same-page "#…" link is a plain anchor, so the browser fires hashchange (the bill list listens for it).
+  return href.startsWith("#") ? (
+    <a href={href} className={linkClass} style={style} title={hint} aria-label={hint ? `${label}: ${hint}` : undefined}>
+      {body}
+    </a>
+  ) : (
+    <Link href={href} className={linkClass} style={style} title={hint} aria-label={hint ? `${label}: ${hint}` : undefined}>
+      {body}
+    </Link>
   );
 }
 

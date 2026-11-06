@@ -73,6 +73,7 @@ export default async function OverviewPage() {
   }
   const candidates = cleanupCandidates(bundles);
   const stoppedBilling = stoppedBillingSummary(bundles);
+  const structure = billStructure(bundles);
   const workspaceCount = bundles.length;
   const randomNames = allProjects
     .filter((p) => !p.deletedAt && !isProtectedProject(p) && isGeneratedRailwayName(p.name, projectNameHints(p)))
@@ -151,20 +152,48 @@ export default async function OverviewPage() {
           </div>
         </Card>
         <div className="grid grid-cols-2 gap-4">
-          <StatTile label="Projects" icon="layers" iconColor="var(--series-1)" value={projectCount} sub={plural(workspaceCount, "workspace")} />
-          <StatTile label="Live services" icon="power" iconColor="var(--good-text)" value={totals.live} sub={totals.sleeping ? `+ ${totals.sleeping} sleeping` : "running now"} />
+          <StatTile label="Projects" icon="layers" iconColor="var(--series-1)" value={projectCount} sub={plural(workspaceCount, "workspace")} href="#workspaces" hint="Jump to the project tables" />
+          <StatTile
+            label="Live services"
+            icon="power"
+            iconColor="var(--good-text)"
+            value={totals.live}
+            sub={totals.sleeping ? `+ ${totals.sleeping} sleeping` : "running now"}
+            href="/services?show=online"
+            hint="Show them in Services"
+          />
           <StatTile
             label="Needs attention"
             icon="alert"
             iconColor={needsAttention(totals) > 0 ? "var(--status-critical)" : "var(--ink-2)"}
             value={needsAttention(totals)}
             sub="crashed, failed or degraded"
+            href="/services?show=attention"
+            hint="Show them in Services"
           />
-          <StatTile label="Offline / removed" icon="moon" value={totals.offline} sub="nothing currently live" />
+          <StatTile label="Offline / removed" icon="moon" value={totals.offline} sub="nothing currently live" href="/services?show=offline" hint="Show them in Services" />
+          {structure.charging.projects > 0 && (
+            <StatTile
+              className="col-span-2"
+              tone="warning"
+              label="Off, but still charging"
+              icon="wallet"
+              iconColor="var(--status-warning)"
+              value={plural(structure.charging.projects, "project")}
+              sub={
+                <>
+                  {structure.recentKnown || structure.charging.perDay > 0 ? `About ${money(structure.charging.perDay)} a day with nothing running` : "Nothing running, but charged in the last 2 days"}
+                  {stoppedBilling.services > 0 && ` · ${plural(stoppedBilling.services, "stopped deployment")} Railway still bills, ready to remove`}
+                </>
+              }
+              href="#still-on-bill"
+              hint="Show the list below"
+            />
+          )}
         </div>
       </div>
 
-      {candidates.length > 0 && <WorthALook candidates={candidates} structure={billStructure(bundles)} renderedAt={Date.now()} />}
+      {candidates.length > 0 && <WorthALook candidates={candidates} structure={structure} renderedAt={Date.now()} />}
 
       {randomNames.length > 0 && (
         <Notice tone="info" title={`${plural(randomNames.length, "project")} still ${randomNames.length === 1 ? "has" : "have"} the random name Railway picked`}>
@@ -176,15 +205,17 @@ export default async function OverviewPage() {
         </Notice>
       )}
 
-      {bundles.map((bundle) => (
-        <WorkspaceSection
-          key={`${bundle.account.key}-${bundle.workspace.id}`}
-          bundle={bundle}
-          showAccount={accounts.length > 1}
-          readOnly={readOnly}
-          blurbs={blurbs}
-        />
-      ))}
+      <div id="workspaces" className="scroll-mt-24 space-y-6">
+        {bundles.map((bundle) => (
+          <WorkspaceSection
+            key={`${bundle.account.key}-${bundle.workspace.id}`}
+            bundle={bundle}
+            showAccount={accounts.length > 1}
+            readOnly={readOnly}
+            blurbs={blurbs}
+          />
+        ))}
+      </div>
     </div>
   );
 }
