@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (November 2026)
 
 **See what's behind every charge, and ask about it.**
 
@@ -19,6 +19,8 @@
 - Saved Railway reads are isolated by credential fingerprint, workspace scope, and query version. Existing cache entries are ignored by the new format.
 - Code indexing excludes common credential files and symlinks, and rejects paths outside the repository. The next index update reprocesses repositories with these rules.
 - Added approval, cache-isolation, and index-path regression tests, plus CI for tests, type checking, and production builds.
+
+Upgrading: `git pull`, then `npm run app`. No new packages. The first load reads Railway again (saved reads now use a new, per-token format), and the next search index update re-reads every repo with the new file rules.
 
 ## 0.3.0 (October 2026)
 

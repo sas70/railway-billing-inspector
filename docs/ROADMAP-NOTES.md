@@ -22,7 +22,7 @@ One request runs a whole chore, e.g. summarize new repos → copy descriptions �
 
 ## Done
 
-### Since 0.3.0 (on `main`, Unreleased)
+### 0.4.0 (Nov 6, 2026)
 
 - **Assistant, step 1.** Ask bubble with four quick actions and answers from the dashboard's data (Claude with `ANTHROPIC_API_KEY`, built-in answers otherwise and on the demo). Links only.
 - **Clickable Overview tiles** and a new **Off, but still charging** tile; Services filters for Needs attention and a stricter Offline.
@@ -46,7 +46,3 @@ Off, but still charging (from the last 2 days' real charges); bill summary by st
 - Rename suggestions are slugs (`acme-status-page`).
 - The assistant is a new way into the existing review → confirm → audit engine, never a separate way to change Railway.
 - Volume contents are always labeled as an inference: Railway's API can't list a volume's files. Railway backups aren't presented as a safe copy before deleting a volume.
-
-## Open questions
-
-- When to cut 0.4.0 from the Unreleased changes.
