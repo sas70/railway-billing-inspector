@@ -11,6 +11,7 @@ import { ProjectRename } from "@/components/ProjectRename";
 import { buttonClass } from "@/components/button";
 import { SetupGuide } from "@/components/SetupGuide";
 import { StoppedBillingAlert } from "@/components/StoppedBillingAlert";
+import { SummaryProgress } from "@/components/SummaryProgress";
 import { WorthALook } from "@/components/WorthALook";
 import {
   Badge,
@@ -25,6 +26,7 @@ import {
   PlanBadge,
   StatTile,
 } from "@/components/ui";
+import { ensureSummaries, summaryJob } from "@/lib/code/ai-summary";
 import { repoBlurbs } from "@/lib/code/blurbs";
 import { repoKey } from "@/lib/code/sources";
 import { isProtectedProject, unmatchedProtectedEntries } from "@/lib/config";
@@ -53,7 +55,11 @@ export default async function OverviewPage() {
   ensureIndex();
   const unmatchedProtected = bundles.every((b) => b.projects.ok) ? unmatchedProtectedEntries(allProjects) : [];
   // Hover cards: saved summaries / local READMEs only, so this adds no Railway or GitHub calls.
-  const blurbs = await repoBlurbs(allProjects.flatMap((p) => p.repos));
+  const allRepos = allProjects.flatMap((p) => p.repos);
+  // Projects with no summary yet get one in the background (needs ANTHROPIC_API_KEY; never in the demo).
+  await ensureSummaries(allRepos);
+  const summaries = summaryJob();
+  const blurbs = await repoBlurbs(allRepos);
 
   const totals = emptyHealthCounts();
   let projectCount = 0;
@@ -116,6 +122,7 @@ export default async function OverviewPage() {
         }
       />
       <StoppedBillingAlert summary={stoppedBilling} />
+      <SummaryProgress initial={summaries} />
       <OverviewSearch totalProjects={projectCount} />
 
       {accounts

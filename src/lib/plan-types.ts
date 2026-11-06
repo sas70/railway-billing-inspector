@@ -8,6 +8,7 @@ export const PLAN_KINDS = [
   "deployment.cancel",
   "service.delete",
   "environment.delete",
+  "volume.delete",
   "project.rename",
   "project.scheduleDelete",
   "project.cancelDelete",

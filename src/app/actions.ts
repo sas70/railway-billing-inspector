@@ -16,6 +16,8 @@ import type { RenameExecutionView, RenamePlanView } from "@/lib/rename-types";
 import { friendlyError, loadDeployment, loadLogs, loadProject } from "@/lib/railway/api";
 import { clearCache } from "@/lib/railway/client";
 import type { LogLine } from "@/lib/railway/types";
+import type { SummaryJob } from "@/lib/code/ai-summary";
+import type { VolumeNote } from "@/lib/volume-insight";
 import type { IndexJob } from "@/lib/search-index/build";
 import type { IndexStats } from "@/lib/search-index/store";
 
@@ -205,6 +207,26 @@ export async function startIndexAction(mode: unknown): Promise<ActionResult<{ st
 }
 
 /** Progress of the search index job, for the status line while it runs. */
+/** Claude's explanation of what a volume most likely holds. Reads Railway; changes nothing. */
+export async function explainVolumeAction(input: unknown): Promise<ActionResult<VolumeNote>> {
+  try {
+    const { explainVolume } = await import("@/lib/volume-insight");
+    return { ok: true, data: await explainVolume(input) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** Progress of the background AI summaries (Railway is not read). */
+export async function summaryJobAction(): Promise<ActionResult<{ job: SummaryJob }>> {
+  try {
+    const { summaryJob } = await import("@/lib/code/ai-summary");
+    return { ok: true, data: { job: summaryJob() } };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
 export async function indexStatusAction(): Promise<ActionResult<{ job: IndexJob; stats: IndexStats }>> {
   try {
     const [{ indexJob }, { indexStats }] = await Promise.all([import("@/lib/search-index/build"), import("@/lib/search-index/store")]);

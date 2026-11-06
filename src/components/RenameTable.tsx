@@ -48,8 +48,13 @@ function checkDraft(row: RenameRow, draft: Draft): Check {
   return { state: "ready", name };
 }
 
+/** A one-row rename started with the row's green check. */
+type QuickState = { state: "working" } | { state: "done"; name: string } | { state: "error"; message: string };
+
 export function RenameTable({ rows, readOnly }: { rows: RenameRow[]; readOnly: boolean }) {
+  const router = useRouter();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+  const [quick, setQuick] = useState<Record<string, QuickState>>({});
   const [review, setReview] = useState<RenameRequestItem[] | null>(null);
   const inputs = useRef(new Map<string, HTMLInputElement>());
   const statusRef = useRef<HTMLParagraphElement>(null);
@@ -119,6 +124,46 @@ export function RenameTable({ rows, readOnly }: { rows: RenameRow[]; readOnly: b
     });
   }
 
+  /** Tick every project that can be renamed, filling in the suggestion where the name is empty. */
+  function tickAll() {
+    setDrafts((current) => {
+      const next = { ...current };
+      for (const row of rows) {
+        if (row.lockReason) continue;
+        const draft = draftFor(current, row);
+        const value = draft.value.trim() ? draft.value : (row.suggestion?.name ?? "");
+        if (value && cleanProjectName(value) !== row.name) next[row.key] = { ...draft, checked: true, value };
+      }
+      return next;
+    });
+  }
+
+  /**
+   * The row's green check: the same plan the bulk review makes (a fresh read of the project on
+   * Railway, protected projects refused, logged in the Audit log), for this one project, approved
+   * in the same click. Renaming is easy to undo, so it skips the typed confirmation.
+   */
+  async function renameNow(row: RenameRow, name: string) {
+    setQuick((q) => ({ ...q, [row.projectId]: { state: "working" } }));
+    const fail = (message: string) => setQuick((q) => ({ ...q, [row.projectId]: { state: "error", message } }));
+    try {
+      const plan = await createRenamePlanAction({ items: [{ projectId: row.projectId, newName: name }] });
+      if (!plan.ok) return fail(plan.error);
+      const item = plan.data.items[0];
+      if (plan.data.blockedReason || plan.data.runnableCount === 0 || !item?.willRun) {
+        return fail(plan.data.blockedReason ?? item?.skipReason ?? "Railway's copy changed; refresh and try again.");
+      }
+      const run = await executeRenamePlanAction(plan.data.id);
+      if (!run.ok) return fail(run.error);
+      const result = run.data.results[0];
+      if (result?.outcome !== "success") return fail(result?.message ?? "Railway didn't confirm the rename. Check it in Railway.");
+      setQuick((q) => ({ ...q, [row.projectId]: { state: "done", name: item.after } }));
+      router.refresh();
+    } catch (error) {
+      fail(error instanceof Error ? error.message : String(error));
+    }
+  }
+
   function untickAll() {
     setDrafts((current) => Object.fromEntries(rows.map((row) => [row.key, { ...draftFor(current, row), checked: false }])));
   }
@@ -165,6 +210,9 @@ export function RenameTable({ rows, readOnly }: { rows: RenameRow[]; readOnly: b
         }
         actions={
           <>
+            <button type="button" className={buttonClass("ghost")} onClick={tickAll}>
+              Select all
+            </button>
             <button type="button" className={buttonClass("ghost")} onClick={tickRandom} disabled={randomRows.length === 0}>
               Tick random names
             </button>
@@ -191,6 +239,9 @@ export function RenameTable({ rows, readOnly }: { rows: RenameRow[]; readOnly: b
             onToggle={(checked) => toggle(row, checked)}
             onEdit={(value) => edit(row, value)}
             onUseSuggestion={() => applySuggestion(row)}
+            quick={quick[row.projectId]}
+            readOnly={readOnly}
+            onRenameNow={(name) => void renameNow(row, name)}
             inputRef={(el) => {
               if (el) inputs.current.set(row.key, el);
               else inputs.current.delete(row.key);
@@ -228,6 +279,9 @@ function RenameRowItem({
   onToggle,
   onEdit,
   onUseSuggestion,
+  quick,
+  readOnly,
+  onRenameNow,
   inputRef,
 }: {
   row: RenameRow;
@@ -237,6 +291,9 @@ function RenameRowItem({
   onToggle: (checked: boolean) => void;
   onEdit: (value: string) => void;
   onUseSuggestion: () => void;
+  quick?: QuickState;
+  readOnly: boolean;
+  onRenameNow: (name: string) => void;
   inputRef: (el: HTMLInputElement | null) => void;
 }) {
   const id = useId();
@@ -244,8 +301,32 @@ function RenameRowItem({
   const suggestion = row.suggestion;
   const usingSuggestion = !!suggestion && draft.value.trim() === suggestion.name;
 
+  const working = quick?.state === "working";
+  // The green check works on the typed name whether or not the row is ticked for the bulk review.
+  const cleaned = draft.value.trim() ? cleanProjectName(draft.value) : null;
+  const quickName = cleaned && cleaned !== row.name ? cleaned : null;
+  const nowReason = readOnly
+    ? "Read-only: enable Write mode in the header to rename."
+    : quickName
+      ? undefined
+      : draft.value.trim() && !cleaned
+        ? `Use 1–${NAME_MAX} characters, without control characters.`
+        : "Type a new name first.";
+
   let hint: React.ReactNode = null;
-  if (locked) {
+  if (quick?.state === "done") {
+    hint = (
+      <span className="inline-flex items-start gap-1 text-ink">
+        <Icon name="check" size={12} color="var(--status-good)" className="mt-0.5 shrink-0" /> Renamed to “{quick.name}”. Logged in the Audit log.
+      </span>
+    );
+  } else if (quick?.state === "error") {
+    hint = (
+      <span className="inline-flex items-start gap-1 text-ink">
+        <Icon name="alert" size={12} color="var(--status-critical)" className="mt-0.5 shrink-0" /> Not renamed: {quick.message}
+      </span>
+    );
+  } else if (locked) {
     hint = `${row.lockReason}, so it can't be renamed here.`;
   } else if (check.state === "problem") {
     hint = (
@@ -308,6 +389,7 @@ function RenameRowItem({
         <label htmlFor={`${id}-name`} className="sr-only">
           New name for {row.name}
         </label>
+        <div className="flex items-center gap-1.5">
         <input
           ref={inputRef}
           id={`${id}-name`}
@@ -320,8 +402,24 @@ function RenameRowItem({
           autoComplete="off"
           aria-invalid={check.state === "problem" || undefined}
           aria-describedby={hint ? `${id}-hint` : undefined}
-          className="w-full rounded-md border border-line-strong bg-page px-2 py-1.5 text-sm outline-none focus:border-(--series-1) disabled:opacity-60"
+          className="w-full min-w-0 rounded-md border border-line-strong bg-page px-2 py-1.5 text-sm outline-none focus:border-(--series-1) disabled:opacity-60"
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && quickName && !nowReason && !working) onRenameNow(quickName);
+          }}
         />
+        {!locked && (
+          <button
+            type="button"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line-strong bg-surface text-[var(--status-good)] transition-colors hover:bg-[var(--good-wash,var(--surface-2))] disabled:cursor-not-allowed disabled:text-ink-2 disabled:opacity-50"
+            disabled={!!nowReason || working}
+            title={nowReason ?? `Rename to “${quickName}” now`}
+            aria-label={nowReason ? `Rename ${row.name} now (${nowReason})` : `Rename ${row.name} to ${quickName} now`}
+            onClick={() => quickName && onRenameNow(quickName)}
+          >
+            <Icon name={working ? "loader" : "check"} size={15} className={working ? "animate-spin" : undefined} />
+          </button>
+        )}
+        </div>
         {hint && (
           <div id={`${id}-hint`} className="mt-1 text-xs text-ink-2">
             {hint}
