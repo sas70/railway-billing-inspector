@@ -47,7 +47,7 @@ One request runs a whole chore, such as "summarize my new apps, copy the descrip
 
 ## Done
 
-**New since 0.3.0** (in `main`, not yet in a numbered release)
+**New in 0.4.0**
 
 - **Ask about your projects (assistant, step 1).** A bubble on every page with four quick actions (Remove stopped deployments, Rename projects, Off but still charging, Needs attention) and answers from your dashboard's data that link to the right screen. Read-only: it never changes anything.
 - **Every number opens its list.** The Overview tiles link to exactly what they count, and a new **Off, but still charging** tile shows the cost per day and the stopped deployments ready to remove.

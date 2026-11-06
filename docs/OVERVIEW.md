@@ -6,7 +6,7 @@ A free, open-source dashboard for your Railway account(s) that runs on your own 
 
 - **Repo:** [sas70/railway-billing-inspector](https://github.com/sas70/railway-billing-inspector) (public, MIT).
 - **Demo:** [railway-billing-inspector.vercel.app](https://railway-billing-inspector.vercel.app) (fake data), with a [tour](https://railway-billing-inspector.vercel.app/tour.html) and a [roadmap](https://railway-billing-inspector.vercel.app/roadmap.html).
-- **Version:** 0.3.0 released; newer features are on `main` under "Unreleased" in the [changelog](../CHANGELOG.md).
+- **Version:** 0.4.0 (November 2026). What changed in each version: the [changelog](../CHANGELOG.md).
 - **Full details:** [the guide](GUIDE.md). Plans and decisions: [roadmap notes](ROADMAP-NOTES.md).
 
 ## What it does
