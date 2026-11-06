@@ -2,7 +2,6 @@ import "server-only";
 
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
-import path from "node:path";
 
 import { savedSummary } from "../code/ai-summary";
 import { MOCK_REPOS } from "../code/mock-corpus";
@@ -11,6 +10,7 @@ import { cloneFor, githubToken, localClones, mapLimit, repoKey, run } from "../c
 import { isMockMode } from "../config";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type ProjectSummary } from "../railway/api";
 import { EMBED_MODEL, embed, embeddingsDisabledReason, toBlob } from "./embed";
+import { safeIndexFile } from "./safe-file";
 import { pruneCopies, syncCopy } from "./repo-cache";
 import { clearIndex, db, getMeta, setMeta } from "./store";
 import { chunkLines, isIndexableFile, MAX_BYTES_PER_REPO, MAX_FILES_PER_REPO, textHash } from "./text";
@@ -149,7 +149,8 @@ async function readTree(dir: string, includeUntracked: boolean): Promise<{ path:
   for (const file of (await gitFiles(dir, includeUntracked)).filter((f) => isIndexableFile(f))) {
     if (files.length >= MAX_FILES_PER_REPO || bytes >= MAX_BYTES_PER_REPO) break;
     try {
-      const full = path.join(dir, file);
+      const full = await safeIndexFile(dir, file);
+      if (!full) continue;
       const info = await stat(full);
       if (!info.isFile() || !isIndexableFile(file, info.size)) continue;
       const text = await readFile(full, "utf8");
@@ -204,7 +205,7 @@ async function indexRepo(repo: string, force: boolean): Promise<"indexed" | "unc
   const where = await locate(repo);
   const summary = await summaryText(repo);
   // A new or changed summary also counts as a change.
-  const version = `${where.version}|${summary ? textHash(summary.body) : "-"}`;
+  const version = `safe-files-v2|${where.version}|${summary ? textHash(summary.body) : "-"}`;
   const previous = d.prepare("SELECT version, error FROM repos WHERE repo = ?").get(key) as { version: string | null; error: string | null } | undefined;
   if (!force && previous?.version === version && !previous.error) return "unchanged";
 

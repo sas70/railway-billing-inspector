@@ -679,6 +679,7 @@ async function recheckItem(
     if (!project) return "The project could not be re-read.";
     if (project.deletedAt) return "The project is scheduled for deletion.";
     if (plan.proposedName && project.name === plan.proposedName) return "Already named that.";
+    if (project.name !== plan.projectName) return "It was renamed after you reviewed it.";
     return null;
   }
   if (kind === "project.scheduleDelete") {

@@ -84,14 +84,14 @@ async function reviewOff(target: BulkTargetInput): Promise<BulkPlanItem[]> {
   if (!account) {
     return [skipped(target, "deployment.remove", "—", "Unknown account.")];
   }
-  const project = await loadProject(account, target.projectId);
+  const project = await loadProject(account, target.projectId, { fresh: true });
   if (isProtectedProject(project)) {
     return [skipped(target, "deployment.remove", "—", `${project.name} is listed in PROTECTED_PROJECTS.`)];
   }
   if (!workspaceAllowed(account, project.workspace?.id)) {
     return [skipped(target, "deployment.remove", "—", "Outside this token's workspace.")];
   }
-  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId);
+  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId, { fresh: true });
   const live = instance.healthInfo.liveDeploymentIds;
   if (instance.healthInfo.health === "deploying") {
     return [skipped(target, "deployment.remove", live[0] ?? "—", "Still deploying — wait or cancel the build on the service page.")];
@@ -116,14 +116,14 @@ async function reviewStopped(target: BulkTargetInput): Promise<BulkPlanItem[]> {
   if (!account) {
     return [skipped(target, "deployment.remove", "—", "Unknown account.")];
   }
-  const project = await loadProject(account, target.projectId);
+  const project = await loadProject(account, target.projectId, { fresh: true });
   if (isProtectedProject(project)) {
     return [skipped(target, "deployment.remove", "—", `${project.name} is listed in PROTECTED_PROJECTS.`)];
   }
   if (!workspaceAllowed(account, project.workspace?.id)) {
     return [skipped(target, "deployment.remove", "—", "Outside this token's workspace.")];
   }
-  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId);
+  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId, { fresh: true });
   const stopped = instance.healthInfo.stoppedDeploymentIds;
   if (stopped.length === 0) {
     return [skipped(target, "deployment.remove", "—", "Nothing stopped is still listed as active.")];
@@ -144,21 +144,21 @@ async function reviewOn(target: BulkTargetInput): Promise<BulkPlanItem[]> {
   if (!account) {
     return [skipped(target, "deployment.redeploy", "—", "Unknown account.")];
   }
-  const project = await loadProject(account, target.projectId);
+  const project = await loadProject(account, target.projectId, { fresh: true });
   if (isProtectedProject(project)) {
     return [skipped(target, "deployment.redeploy", "—", `${project.name} is listed in PROTECTED_PROJECTS.`)];
   }
   if (!workspaceAllowed(account, project.workspace?.id)) {
     return [skipped(target, "deployment.redeploy", "—", "Outside this token's workspace.")];
   }
-  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId);
-  if (instance.healthInfo.liveDeploymentIds.length > 0) {
-    return [skipped(target, "deployment.redeploy", instance.healthInfo.liveDeploymentIds[0] ?? "—", "Already online.")];
+  const instance = await loadServiceInstance(account, target.environmentId, target.serviceId, { fresh: true });
+  if (instance.healthInfo.liveDeploymentIds.length > 0 || instance.healthInfo.health === "deploying") {
+    return [skipped(target, "deployment.redeploy", instance.healthInfo.liveDeploymentIds[0] ?? "—", "Already online or deploying.")];
   }
   let pickId = target.latestId;
   if (pickId) {
     try {
-      const d = await loadDeployment(account, pickId);
+      const d = await loadDeployment(account, pickId, { fresh: true });
       if (!d.canRedeploy || IN_PROGRESS.has(d.status)) pickId = null;
     } catch {
       pickId = null;
@@ -382,6 +382,11 @@ export async function executeBulkPlan(planId: unknown, typedPhrase: unknown, sel
           else if (stored.view.mode === "stopped" && !d.deploymentStopped) skipReason = "It's running again, so it was left alone.";
         } else if (IN_PROGRESS.has(d.status) || !d.canRedeploy) {
           skipReason = "Railway says this deployment can't be redeployed right now.";
+        } else {
+          const instance = await loadServiceInstance(account, row.environmentId, row.serviceId, { fresh: true });
+          if (instance.healthInfo.liveDeploymentIds.length || instance.healthInfo.health === "deploying") {
+            skipReason = "The service is already online or deploying, so it was left alone.";
+          }
         }
       }
     } catch (error) {

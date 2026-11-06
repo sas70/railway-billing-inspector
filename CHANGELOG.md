@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Bulk turn-on rechecks service state immediately before execution and skips services already online or deploying. Bulk reviews fetch fresh project and service state.
+- Single-project rename skips names changed since review, matching bulk rename behavior.
+- Saved Railway reads are isolated by credential fingerprint, workspace scope, and query version. Existing cache entries are ignored by the new format.
+- Code indexing excludes common credential files and symlinks, and rejects paths outside the repository. The next index update reprocesses repositories with these rules.
+- Added approval, cache-isolation, and index-path regression tests, plus CI for tests, type checking, and production builds.
+
 ## 0.3.0 (October 2026)
 
 **Stop paying for deployments Railway already stopped.**

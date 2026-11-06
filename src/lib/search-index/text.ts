@@ -18,8 +18,13 @@ const SKIP_FILE =
 const BINARY_EXT =
   /\.(png|jpe?g|gif|webp|avif|ico|bmp|tiff?|psd|svg|eps|pdf|zip|gz|tgz|bz2|xz|7z|rar|tar|jar|war|whl|egg|so|dylib|dll|exe|bin|o|a|class|pyc|pyo|wasm|woff2?|ttf|otf|eot|mp3|mp4|m4a|wav|ogg|flac|mov|avi|mkv|webm|sqlite3?|db|parquet|feather|arrow|h5|hdf5|pkl|pickle|pt|pth|onnx|safetensors|ckpt|npy|npz|xlsx?|docx?|pptx?|key|numbers|pages|csv|tsv|ipynb)$/i;
 
+// Ignore credentials even when accidentally tracked by Git.
+const SENSITIVE_FILE = /(^|\/)(\.env(?:\..*)?|\.npmrc|\.netrc|\.pypirc|credentials(?:\.[^/]*)?|secrets?(?:\.[^/]*)?|id_(?:rsa|dsa|ecdsa|ed25519)(?:\.pub)?|[^/]+\.(?:pem|key|p12|pfx|keystore))$/i;
+const SENSITIVE_DIR = /(^|\/)(\.ssh|\.aws|\.gnupg)(\/|$)/i;
+
 /** Whether a repo file is worth indexing as text. `size` in bytes, when known. */
 export function isIndexableFile(path: string, size?: number): boolean {
+  if (SENSITIVE_FILE.test(path) || SENSITIVE_DIR.test(path)) return false;
   if (SKIP_DIR.test(path) || SKIP_FILE.test(path) || BINARY_EXT.test(path)) return false;
   if (size != null && size > MAX_FILE_BYTES) return false;
   return true;

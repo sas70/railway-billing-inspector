@@ -168,6 +168,11 @@ These use a 30-day month (43,200 minutes). Other inputs:
 
 Run `npm test` for all unit tests: `test:cost-history` (date windows, project and resource deltas, missing data, deleted projects, zero baselines), `test:descriptions` (how summaries become Railway descriptions: joining, de-duplicating, trimming), `test:worth-a-look` (the Overview's time filter) `test:names` (rename suggestions: slugs, spotting Railway's random names, keeping suggestions unique), `test:preload` (which tabs load in the background) and `test:index` (search index: which files are read, chunking, query parsing, ranking).
 
+`npm run test:safety` exercises the approval engines with mocked Railway I/O (including concurrent approvals, expiration, changed state, workspace restrictions, and audit-write failures), persisted cache isolation, and index file boundaries. GitHub Actions runs tests, type checking, and a mock-mode production build on pushes and pull requests.
+
+Code indexing excludes common credential files (including `.env*`, `.npmrc`, and private keys), skips symlinks, and rejects paths outside the repository. After upgrading, use **Search → Update** to replace existing indexed code with these exclusions. Saved Railway reads are scoped to the credential and workspace configuration, so replacing a token does not reuse the previous account's reads.
+
+
 ```bash
 npm run check:queries
 ```

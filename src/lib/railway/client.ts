@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createHash } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -286,7 +287,11 @@ export async function railwayRequest<T>(
     }
   }
 
-  const cacheKey = `${account.key}|${doc.name}|${stableStringify(variables)}`;
+  // Never reuse another credential's persisted reads when an account alias is reassigned.
+  // v2 also prevents old cache entries from being read after this format change.
+  const identity = createHash("sha256").update(JSON.stringify([account.token, account.workspaceId ?? null])).digest("hex");
+  const operation = createHash("sha256").update(doc.query).digest("hex");
+  const cacheKey = `${account.key}|v2|${identity}|${doc.name}|${operation}|${stableStringify(variables)}`;
   if (!opts.fresh) {
     const hit = readSaved(cacheKey);
     if (hit) return hit.data as T;
