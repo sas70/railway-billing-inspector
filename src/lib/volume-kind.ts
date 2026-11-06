@@ -78,7 +78,7 @@ const IMAGE_RULES: Rule[] = [
 ];
 
 const PATH_RULES: Rule[] = [
-  { test: /^\/data\/?$|redis/i, kind: IMAGE_RULES[0].kind },
+  { test: /redis/i, kind: IMAGE_RULES[0].kind },
   { test: /postgres|pgdata/i, kind: IMAGE_RULES[1].kind },
   { test: /mysql/i, kind: IMAGE_RULES[2].kind },
   { test: /mongo|\/data\/db/i, kind: IMAGE_RULES[3].kind },

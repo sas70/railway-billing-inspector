@@ -38,8 +38,9 @@ function loader(stubs = {}, globals = {}, env = {}) {
 
 function approvalHarness() {
   const state = {
-    project: { id: 'p1', name: 'original', workspace: { id: 'w1', name: 'Workspace' }, services: [], environments: [] },
+    project: { id: 'p1', name: 'original', workspace: { id: 'w1', name: 'Workspace' }, services: [], environments: [{ id: 'e1', name: 'Production' }] },
     instance: { healthInfo: { health: 'offline', liveDeploymentIds: [] }, latestDeployment: null },
+    volume: { id: 'vi1', volume: { id: 'v1', name: 'data' }, serviceId: 's1', mountPath: '/data', currentSizeMB: 100, sizeMB: 1000 },
     readOnly: false, protected: false, auditFails: false, mutations: [], events: [], reads: [],
   };
   const account = { key: 'main', label: 'Main', token: 'test', workspaceId: 'w1' };
@@ -59,15 +60,17 @@ function approvalHarness() {
       friendlyError: (e) => e.message,
       loadProject: async () => structuredClone(state.project),
       loadWorkspaceProjects: async () => [],
+      loadEnvironment: async () => ({ id: 'e1', name: 'Production', volumes: [structuredClone(state.volume)], instances: [{ ...structuredClone(state.instance), serviceId: 's1', serviceName: 'Service' }] }),
       loadServiceInstance: async (...args) => { state.reads.push(args); return structuredClone(state.instance); },
       loadDeployment: async () => ({ ...deployment }),
     },
     [path.join(root, 'railway/client.ts')]: {
       clearCache: () => {},
       railwayRequest: async (a, doc, variables) => {
+        if (doc.kind === 'query') return { volumeInstanceBackupList: [] };
         assert.equal(state.events.at(-1)?.outcome, 'started', 'audit must precede mutation');
         state.mutations.push({ doc, variables });
-        return { deploymentRedeploy: { id: 'new', status: 'BUILDING' }, projectUpdate: { id: 'p1', name: variables.input?.name } };
+        return { volumeDelete: true, deploymentRedeploy: { id: 'new', status: 'BUILDING' }, projectUpdate: { id: 'p1', name: variables.input?.name } };
       },
     },
   });
@@ -75,7 +78,8 @@ function approvalHarness() {
   const plans = load('plans');
   const createBulk = () => bulk.createBulkPlan({ mode: 'on', targets: [{ accountKey: 'main', projectId: 'p1', projectName: 'original', serviceId: 's1', serviceName: 'Service', environmentId: 'e1', latestId: 'd1' }] });
   const createRename = () => plans.createPlan({ kind: 'project.rename', accountKey: 'main', projectId: 'p1', targetIds: ['p1'], newName: 'proposed' });
-  return { state, bulk, plans, createBulk, createRename };
+  const createVolume = () => plans.createPlan({ kind: 'volume.delete', accountKey: 'main', projectId: 'p1', environmentId: 'e1', targetIds: ['v1'] });
+  return { state, bulk, plans, createBulk, createRename, createVolume };
 }
 
 for (const health of ['live', 'sleeping', 'deploying']) {
@@ -217,3 +221,93 @@ test('index excludes credentials, traversal and file/directory symlinks while ke
     assert.equal(await safeIndexFile(repo, path.join(dir, 'outside.ts')), null);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+for (const change of ['live', 'sleeping', 'deploying', 'attachment', 'mount', 'instance']) {
+  test(`volume deletion skips changed ${change} after review`, async () => {
+    const h = approvalHarness();
+    const plan = await h.createVolume();
+    assert.equal(plan.runnableCount, 1);
+    if (change === 'attachment') h.state.volume.serviceId = 'other';
+    else if (change === 'mount') h.state.volume.mountPath = '/other';
+    else if (change === 'instance') h.state.volume.id = 'replacement';
+    else h.state.instance.healthInfo.health = change;
+    const result = await h.plans.executePlan(plan.id, plan.phrase);
+    assert.equal(result.skipped, 1);
+    assert.equal(h.state.mutations.length, 0);
+  });
+}
+
+test('unchanged volume deletion succeeds with audit before mutation', async () => {
+  const h = approvalHarness();
+  const plan = await h.createVolume();
+  assert.equal((await h.plans.executePlan(plan.id, plan.phrase)).succeeded, 1);
+  assert.equal(h.state.mutations.length, 1);
+});
+
+for (const scope of ['wrong-workspace', 'unknown-workspace', 'wrong-environment', 'allowed']) {
+  test(`volume explanation enforces scope: ${scope}`, async () => {
+    let environmentReads = 0;
+    const load = loader({
+      [path.join(root, 'plans.ts')]: { UserFacingError: class extends Error {} },
+      [path.join(root, 'config.ts')]: {
+        getAccount: () => ({ workspaceId: 'w1' }), isMockMode: () => true,
+        workspaceAllowed: (a, id) => a.workspaceId === id,
+      },
+      [path.join(root, 'code/ai-summary.ts')]: { aiSummariesAvailable: () => true },
+      [path.join(root, 'railway/api.ts')]: {
+        loadProject: async (a, id, opts) => {
+          assert.equal(opts.fresh, true);
+          return { id: 'p1', workspace: scope === 'unknown-workspace' ? null : { id: scope === 'wrong-workspace' ? 'w2' : 'w1' }, environments: [{ id: 'e1' }] };
+        },
+        loadEnvironment: async (a, p, e, opts) => {
+          environmentReads++;
+          assert.equal(opts.fresh, true);
+          return { instances: [], volumes: [{ volume: { id: 'v1' }, mountPath: '/data', currentSizeMB: 100 }] };
+        },
+      },
+    });
+    const request = { accountKey: 'main', projectId: 'p1', environmentId: scope === 'wrong-environment' ? 'e2' : 'e1', volumeId: 'v1' };
+    const explain = load('volume-insight').explainVolume;
+    if (scope === 'allowed') {
+      assert.equal((await explain(request)).volumeId, 'v1');
+      assert.equal(environmentReads, 1);
+    } else {
+      await assert.rejects(explain(request), /workspace|environment/);
+      assert.equal(environmentReads, 0, 'reject before gathering volume or code context');
+    }
+  });
+}
+
+for (const missing of ['usage', 'recent', 'projects', 'account', 'none']) {
+  test(`chat snapshot preserves missing ${missing} data`, async () => {
+    const ok = (value) => ({ ok: true, value });
+    const failed = { ok: false, error: 'unavailable' };
+    const project = { id: 'p1', name: 'test-project', repos: [], health: { live: 0, sleeping: 0, crashed: 0, failed: 0, degraded: 0 }, environments: [], serviceCount: 1 };
+    const bundle = { account: { key: 'main' }, workspace: { name: 'Work' }, projects: missing === 'projects' ? failed : ok([project]), usage: missing === 'usage' ? failed : ok({}), recent: missing === 'recent' ? failed : ok({}) };
+    const load = loader({
+      [path.join(root, 'config.ts')]: { isProtectedProject: () => false },
+      [path.join(root, 'code/ai-summary.ts')]: { savedSummaries: async () => new Map() },
+      [path.join(root, 'code/sources.ts')]: { repoKey: (r) => r },
+      [path.join(root, 'railway/api.ts')]: {
+        loadAccountViews: async () => [{ label: 'Main', error: missing === 'account' ? 'unavailable' : null }],
+        uniqueWorkspaceTargets: () => missing === 'account' ? [] : [{ account: {}, workspace: {} }],
+        loadWorkspaceBundle: async () => bundle,
+      },
+      [path.join(root, 'summaries.ts')]: {
+        workspaceFigures: () => ({ usageByProject: new Map(), usageToDate: null }),
+        billStructure: () => ({ charging: { projects: 0, perDay: 0 } }),
+        stoppedBillingSummary: () => ({ services: 0, perDay: null }),
+      },
+    });
+    const snapshot = await load('chat/context').chatSnapshot();
+    assert.equal(snapshot.dataIssues.length > 0, missing !== 'none');
+    if (missing === 'usage') assert.equal(snapshot.projects[0].costThisPeriod, null);
+    if (missing === 'recent') assert.equal(snapshot.projects[0].status, 'unknown');
+    if (missing === 'none') assert.equal(snapshot.projects[0].costThisPeriod, 0);
+    const answer = load('chat/built-in').builtInAnswer(snapshot, 'what costs money?', { demo: true });
+    if (missing !== 'none') {
+      assert.match(answer, /incomplete/);
+      assert.doesNotMatch(answer, /Nothing has cost anything/);
+    } else assert.match(answer, /Nothing has cost anything/);
+  });
+}

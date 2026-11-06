@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Volume deletion requires a new review if the volume instance, service attachment, mount path, or running state changes after approval was prepared.
+- Volume explanations enforce the configured workspace scope and verify environment membership using fresh reads before collecting context.
+- Assistant answers preserve unavailable costs and recent charges, and disclose incomplete account or workspace data instead of reporting zero spending.
+- Generic `/data` mount paths no longer imply Redis; specific image or path evidence is required.
+- Added regression tests for changed volume state, explanation access checks, and incomplete assistant data.
+
 ## 0.4.0 (November 2026)
 
 **See what's behind every charge, and ask about it.**

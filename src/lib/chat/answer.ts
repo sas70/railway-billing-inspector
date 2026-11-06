@@ -23,17 +23,19 @@ Rules:
 - You can't change anything. When the user wants to act (rename, remove, delete, turn off), link to the screen where they can, and mention that the dashboard shows a review they approve.
 - Link with Markdown, only to paths from the snapshot (project "href" values, "stoppedHref", or the app screens list). Example: [heroic-contentment](/a/main/p/abc). No other URLs.
 - "charging" means nothing is running but Railway charged it in the last ${2} days; "stoppedButBilled" lists services whose deployment Railway marked stopped but still bills for memory.
+- If dataIssues is nonempty, clearly state which data is unavailable and qualify totals as partial. Null costs and unknown statuses are unavailable, never zero or proof of no charges.
 - Costs are estimates from Railway's usage; the invoice is authoritative.`;
 
 function snapshotText(s: ChatSnapshot): string {
   return JSON.stringify({
     screens: APP_ROUTES,
+    dataIssues: s.dataIssues,
     workspaces: s.workspaces,
     offStillCharging: s.offStillCharging,
     stoppedBilling: s.stoppedBilling,
     projects: s.projects.map((p) => ({
       ...p,
-      costThisPeriod: Math.round(p.costThisPeriod * 100) / 100,
+      costThisPeriod: p.costThisPeriod == null ? null : Math.round(p.costThisPeriod * 100) / 100,
       costPerDayRecent: p.costPerDayRecent == null ? null : Math.round(p.costPerDayRecent * 1000) / 1000,
     })),
   });

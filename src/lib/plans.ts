@@ -65,6 +65,8 @@ const DESTRUCTIVE: ReadonlySet<PlanKind> = new Set([
   "project.scheduleDelete",
 ]);
 
+type ReviewedVolume = { instanceId: string; serviceId: string | null; mountPath: string; running: boolean };
+
 type StoredPlan = {
   view: PlanView;
   accountKey: string;
@@ -79,6 +81,7 @@ type StoredPlan = {
   serviceName?: string;
   /** Deployment kinds: was each runnable deployment live when reviewed? */
   reviewedLive: Record<string, boolean>;
+  reviewedVolume?: ReviewedVolume;
   /** project.rename: the name the review approved. */
   proposedName?: string;
   expiresAtMs: number;
@@ -171,6 +174,7 @@ type Draft = {
   serviceId?: string;
   serviceName?: string;
   reviewedLive?: Record<string, boolean>;
+  reviewedVolume?: ReviewedVolume;
   blockedReason?: string;
 };
 
@@ -422,6 +426,7 @@ async function draftVolumeDelete(account: AccountConfig, req: PlanRequest, proje
 
   const perDay = volumeCostPerDay(vol.currentSizeMB);
   return {
+    reviewedVolume: { instanceId: vol.id, serviceId: vol.serviceId ?? null, mountPath: vol.mountPath, running },
     title: `Delete volume ${vol.volume.name}`,
     verb: "Delete volume",
     items: [
@@ -633,6 +638,7 @@ export async function createPlan(input: unknown): Promise<PlanView> {
     serviceId: draft.serviceId,
     serviceName: draft.serviceName,
     reviewedLive: draft.reviewedLive ?? {},
+    reviewedVolume: draft.reviewedVolume,
     proposedName: req.newName,
     expiresAtMs,
   });
@@ -753,6 +759,13 @@ async function recheckItem(
     const vol = envView.volumes.find((v) => v.volume.id === targetId);
     if (!vol) return "The volume is no longer in that environment.";
     if (vol.isPendingDeletion) return "Railway already has it queued for deletion.";
+    const reviewed = plan.reviewedVolume;
+    if (!reviewed) return "Volume review is out of date. Review it again.";
+    const attached = envView.instances.find((i) => i.serviceId === vol.serviceId);
+    const running = !!attached && ["live", "sleeping", "deploying"].includes(attached.healthInfo.health);
+    if (vol.id !== reviewed.instanceId || (vol.serviceId ?? null) !== reviewed.serviceId || vol.mountPath !== reviewed.mountPath || running !== reviewed.running) {
+      return "The volume's attachment or running state changed after review. Review it again.";
+    }
     return null;
   }
   if (kind === "project.rename") {

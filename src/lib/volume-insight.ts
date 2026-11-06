@@ -8,7 +8,7 @@ import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
 
 import { aiSummariesAvailable, repoCodeContext, savedSummaries, SUMMARY_MODEL } from "./code/ai-summary";
-import { getAccount, isMockMode } from "./config";
+import { getAccount, isMockMode, workspaceAllowed } from "./config";
 import { UserFacingError } from "./plans";
 import { money, sizeMB } from "./format";
 import { loadEnvironment, loadProject } from "./railway/api";
@@ -75,8 +75,12 @@ export async function explainVolume(input: unknown): Promise<VolumeNote> {
   if (!account) throw new UserFacingError("Unknown account.");
   if (!volumeNotesAvailable()) throw new UserFacingError("Set ANTHROPIC_API_KEY in .env.local to turn on Claude explanations.");
 
-  const project = await loadProject(account, raw.projectId as string);
-  const envView = await loadEnvironment(account, project.id, raw.environmentId as string);
+  const project = await loadProject(account, raw.projectId as string, { fresh: true });
+  if (!workspaceAllowed(account, project.workspace?.id)) throw new UserFacingError("Outside this token's workspace.");
+  if (!project.environments.some((e) => e.id === raw.environmentId)) {
+    throw new UserFacingError("That environment isn't part of this project.");
+  }
+  const envView = await loadEnvironment(account, project.id, raw.environmentId as string, { fresh: true });
   const vol = envView.volumes.find((v) => v.volume.id === raw.volumeId);
   if (!vol) throw new UserFacingError("That volume isn't in this environment any more. Press Refresh.");
   const attached = envView.instances.find((i) => i.serviceId === vol.serviceId);

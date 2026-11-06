@@ -32,7 +32,7 @@ test("known database images are recognized from the image", () => {
 
 test("with no image, the mount path is a weaker hint", () => {
   assert.equal(guessVolumeKind({ image: null, mountPath: "/var/lib/postgresql/data", hasRepo: false }).basis, "path");
-  assert.equal(guessVolumeKind({ image: null, mountPath: "/data", hasRepo: false }).label, "Redis data");
+  assert.equal(guessVolumeKind({ image: null, mountPath: "/data", hasRepo: false }).label, "Unknown data");
 });
 
 test("an app built from a repo is judged by its code, not the path", () => {
@@ -44,4 +44,11 @@ test("an app built from a repo is judged by its code, not the path", () => {
 test("cost per day uses Railway's list price on used space", () => {
   // 1.03 GB at $0.15 / GB / month is about half a cent a day.
   assert.ok(Math.abs(volumeCostPerDay(1030) - 0.00515) < 1e-6);
+});
+
+test("generic mount paths do not identify an unknown Docker image as Redis", () => {
+  for (const image of [null, "acme/uploads:latest"]) {
+    assert.equal(guessVolumeKind({ image, mountPath: "/data", hasRepo: false }).basis, "unknown");
+  }
+  assert.equal(guessVolumeKind({ image: null, mountPath: "/var/lib/redis", hasRepo: false }).label, "Redis data");
 });

@@ -13,9 +13,9 @@ export type ChatProject = {
   live: number;
   sleeping: number;
   attention: number;
-  /** running: something is live · charging: nothing running, still charged lately · stopped: no recent charges */
-  status: "running" | "charging" | "stopped";
-  costThisPeriod: number;
+  /** running: something is live · charging: nothing running, still charged lately · stopped: no recent charges · unknown: recent charges unavailable */
+  status: "running" | "charging" | "stopped" | "unknown";
+  costThisPeriod: number | null;
   costPerDayRecent: number | null;
   biggestCost: string | null;
   /** Services whose deployment Railway stopped but still bills. */
@@ -27,6 +27,8 @@ export type ChatProject = {
 };
 
 export type ChatSnapshot = {
+  /** Missing reads: answers must qualify totals and absence claims. */
+  dataIssues: string[];
   projects: ChatProject[];
   workspaces: { workspace: string; usageSoFar: number | null; projected: number | null }[];
   offStillCharging: { projects: number; perDay: number };

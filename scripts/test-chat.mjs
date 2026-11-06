@@ -19,6 +19,7 @@ const project = (name, extra = {}) => ({
   randomName: false, protected: false, lastDeployAt: null, ...extra,
 });
 const snapshot = {
+  dataIssues: [],
   projects: [
     project("heroic-contentment", { status: "charging", costThisPeriod: 1.06, costPerDayRecent: 0.035, biggestCost: "memory", stoppedButBilled: ["chart_all"], stoppedHref: "/a/main/p/heroic-contentment/s/svc?env=e", randomName: true }),
     project("upwork-proposals", { status: "running", live: 1, costThisPeriod: 1.24 }),
@@ -71,4 +72,12 @@ test("messages are trimmed to the last turns and must end with the user", () => 
 test("'still charging' leads with the charging list", () => {
   const a = builtInAnswer(snapshot, "what's still charging me?", { demo: true });
   assert.ok(a.indexOf("nothing running still charge") < a.indexOf("Biggest costs"));
+});
+
+test("unavailable project costs and recent charges are never described as zero", () => {
+  const s = { ...snapshot, dataIssues: ["Personal: project costs unavailable.", "Personal: recent charges unavailable."], projects: [project("example", { costThisPeriod: null, costPerDayRecent: null, status: "unknown" })] };
+  const a = builtInAnswer(s, "what about example?", { demo: false });
+  assert.match(a, /Cost this period: unavailable/);
+  assert.match(a, /recent charges unavailable/);
+  assert.doesNotMatch(a, /no recent charges|\$0.00/);
 });

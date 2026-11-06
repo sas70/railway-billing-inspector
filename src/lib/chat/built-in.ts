@@ -28,11 +28,11 @@ function describe(p: ChatProject): string {
       ? `${p.live} live${p.sleeping ? `, ${p.sleeping} sleeping` : ""}`
       : p.status === "charging"
         ? "nothing running, but still charging"
-        : "nothing running, no recent charges";
+        : p.status === "unknown" ? "nothing running; recent charges unavailable" : "nothing running, no recent charges";
   const lines = [
     `**${p.name}** (${p.workspace}): ${state}.`,
     p.about ? p.about : null,
-    `Cost this period: ${money(p.costThisPeriod)}${p.costPerDayRecent != null ? `, about ${money(p.costPerDayRecent)} a day lately` : ""}${p.biggestCost ? `, mostly ${p.biggestCost}` : ""}.`,
+    `Cost this period: ${p.costThisPeriod == null ? "unavailable" : money(p.costThisPeriod)}${p.costPerDayRecent != null ? `, about ${money(p.costPerDayRecent)} a day lately` : ""}${p.biggestCost ? `, mostly ${p.biggestCost}` : ""}.`,
     p.attention ? `${p.attention} service${p.attention === 1 ? "" : "s"} need attention.` : null,
     p.stoppedButBilled.length
       ? `Railway stopped ${p.stoppedButBilled.join(", ")} but still bills it: [remove the stopped deployment](${p.stoppedHref ?? "/services?show=stopped"}).`
@@ -43,7 +43,7 @@ function describe(p: ChatProject): string {
   return lines.filter(Boolean).join("\n");
 }
 
-export function builtInAnswer(snapshot: ChatSnapshot, question: string, opts: { demo: boolean }): string {
+function answer(snapshot: ChatSnapshot, question: string, opts: { demo: boolean }): string {
   const q = question.toLowerCase();
   const note = opts.demo ? "\n\n_Demo: these are built-in answers. Run it with your Claude key for full answers._" : "\n\n_Built-in answer. Add ANTHROPIC_API_KEY to .env.local for full answers._";
   const ps = snapshot.projects;
@@ -53,14 +53,14 @@ export function builtInAnswer(snapshot: ChatSnapshot, question: string, opts: { 
 
   if (has(q, "stopped", "still bill")) {
     const s = ps.filter((p) => p.stoppedButBilled.length > 0);
-    if (s.length === 0) return `No deployments are stopped but still billed right now.${note}`;
+    if (s.length === 0) return `No stopped-but-billed deployments appear in the available project data.${note}`;
     return `${s.length} project${s.length === 1 ? "" : "s"} have a deployment Railway stopped but still bills${snapshot.stoppedBilling.perDay != null ? ` (about ${money(snapshot.stoppedBilling.perDay)} a day)` : ""}:\n${list(s, (p) => `${link(p)}: ${p.stoppedButBilled.join(", ")}`)}\n\n[Review and remove them](/services?show=stopped)${note}`;
   }
   if (has(q, "charg", "cost", "bill", "expensive", "spend", "paying", "money")) {
     const charging = ps.filter((p) => p.status === "charging").sort((a, b) => (b.costPerDayRecent ?? 0) - (a.costPerDayRecent ?? 0));
-    const top = [...ps].sort((a, b) => b.costThisPeriod - a.costThisPeriod).filter((p) => p.costThisPeriod > 0);
+    const top = [...ps].sort((a, b) => (b.costThisPeriod ?? 0) - (a.costThisPeriod ?? 0)).filter((p) => p.costThisPeriod != null && p.costThisPeriod > 0);
     const parts = [
-      top.length ? `Biggest costs this period:\n${list(top, (p) => `${link(p)}: ${money(p.costThisPeriod)}`)}` : "Nothing has cost anything this period.",
+      top.length ? `Biggest costs this period:\n${list(top, (p) => `${link(p)}: ${money(p.costThisPeriod)}`)}` : (snapshot.dataIssues?.length || ps.some((p) => p.costThisPeriod == null) ? "No positive costs are visible in the available data; costs are incomplete. [Check Billing](/billing)." : "Nothing has cost anything this period."),
       charging.length
         ? `\n${charging.length} project${charging.length === 1 ? "" : "s"} with nothing running still charge, about ${money(snapshot.offStillCharging.perDay)} a day:\n${list(charging, (p) => `${link(p)}: ${money(p.costPerDayRecent)} a day${p.biggestCost ? `, mostly ${p.biggestCost}` : ""}`)}\n\n[See the full list](/#still-on-bill)`
         : null,
@@ -75,7 +75,7 @@ export function builtInAnswer(snapshot: ChatSnapshot, question: string, opts: { 
   }
   if (has(q, "attention", "crash", "fail", "broken", "error", "down")) {
     const bad = ps.filter((p) => p.attention > 0);
-    if (bad.length === 0) return `Nothing has crashed or failed.${note}`;
+    if (bad.length === 0) return `No crashed or failed services appear in the available project data.${note}`;
     return `${bad.length} project${bad.length === 1 ? "" : "s"} need attention:\n${list(bad, (p) => `${link(p)}: ${p.attention} service${p.attention === 1 ? "" : "s"}`)}\n\n[Open them in Services](/services?show=attention)${note}`;
   }
   if (has(q, "live", "running", "online")) {
@@ -86,4 +86,11 @@ export function builtInAnswer(snapshot: ChatSnapshot, question: string, opts: { 
     return `You have ${ps.length} projects across ${snapshot.workspaces.length} workspace${snapshot.workspaces.length === 1 ? "" : "s"}: ${ps.filter((p) => p.status === "running").length} running, ${ps.filter((p) => p.status === "charging").length} off but still charging, ${ps.filter((p) => p.attention > 0).length} needing attention. [Overview](/)${note}`;
   }
   return `I can answer questions about your Railway projects: what costs money, what's still charging with nothing running, what's broken, what a project does, or where to rename. Try "what's still charging?" or a project name.${note}`;
+}
+
+/** Qualify every answer when account, project or usage reads are incomplete. */
+export function builtInAnswer(snapshot: ChatSnapshot, question: string, opts: { demo: boolean }): string {
+  const issues = snapshot.dataIssues ?? [];
+  const prefix = issues.length ? `Data is incomplete: ${issues.join(" ")} The following covers only available data.\n\n` : "";
+  return prefix + answer(snapshot, question, opts);
 }

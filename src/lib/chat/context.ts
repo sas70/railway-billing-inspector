@@ -22,6 +22,12 @@ export async function chatSnapshot(): Promise<ChatSnapshot> {
   const repos = [...new Set(bundles.flatMap((b) => (b.projects.ok ? b.projects.value.flatMap((p) => p.repos) : [])))];
   const summaries = await savedSummaries(repos);
 
+  const dataIssues = accounts.filter((a) => a.error).map((a) => `Account ${a.label}: workspace list unavailable.`);
+  for (const b of bundles) {
+    if (!b.projects.ok) dataIssues.push(`${b.workspace.name}: projects unavailable.`);
+    if (!b.usage.ok) dataIssues.push(`${b.workspace.name}: project costs unavailable.`);
+    if (!b.recent?.ok) dataIssues.push(`${b.workspace.name}: recent charges unavailable.`);
+  }
   const projects: ChatProject[] = [];
   for (const bundle of bundles) {
     if (!bundle.projects.ok) continue;
@@ -45,8 +51,8 @@ export async function chatSnapshot(): Promise<ChatSnapshot> {
         live: p.health.live,
         sleeping: p.health.sleeping,
         attention: p.health.crashed + p.health.failed + p.health.degraded,
-        status: billStatus({ running, recent: recentTotal, volumeSoFar: cost?.volume ?? 0 }),
-        costThisPeriod: cost?.total ?? 0,
+        status: running === 0 && recentTotal == null ? "unknown" : billStatus({ running, recent: recentTotal, volumeSoFar: cost?.volume ?? 0 }),
+        costThisPeriod: bundle.usage.ok ? (cost?.total ?? 0) : null,
         costPerDayRecent: recentTotal == null ? null : recentTotal / RECENT_DAYS,
         biggestCost: cost ? biggestPart(cost) : null,
         stoppedButBilled: stopped,
@@ -65,6 +71,7 @@ export async function chatSnapshot(): Promise<ChatSnapshot> {
     return { workspace: b.workspace.name, usageSoFar: f.usageToDate ?? null, projected: f.projection?.projectedCost ?? null };
   });
   return {
+    dataIssues,
     projects,
     workspaces: plans,
     offStillCharging: { projects: structure.charging.projects, perDay: structure.charging.perDay },
