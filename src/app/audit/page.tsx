@@ -21,6 +21,7 @@ const KIND_LABEL: Record<AuditKind, string> = {
   "deployment.cancel": "Cancel build",
   "service.delete": "Delete service",
   "environment.delete": "Delete environment",
+  "volume.delete": "Delete volume",
   "project.rename": "Rename project",
   "project.describe": "Set project description",
   "project.scheduleDelete": "Schedule project deletion",

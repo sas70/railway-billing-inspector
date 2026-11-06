@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { NavLink } from "@/components/NavLink";
+import { ChatAssistant } from "@/components/ChatAssistant";
 import { Preloader } from "@/components/Preloader";
 import { RefreshButton } from "@/components/RefreshButton";
 import { WriteModeToggle } from "@/components/WriteModeToggle";
@@ -53,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const demo = isMockMode();
   return (
     <html lang="en">
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen pb-20 antialiased">
         <a
           href="#main"
           className="sr-only rounded-md bg-surface px-3 py-2 text-sm focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50"
@@ -99,6 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </main>
         <Footer />
         <Preloader />
+        {(demo || getAccounts().length > 0) && <ChatAssistant />}
       </body>
     </html>
   );

@@ -5,7 +5,8 @@ import { randomUUID } from "node:crypto";
 import { appendAudit, readAudit, type AuditEvent } from "./audit";
 import { getAccount, isMockMode, isProtectedProject, workspaceAllowed, type AccountConfig } from "./config";
 import { isReadOnly } from "./write-mode";
-import { dateTime, deploymentMeta, plural, shortId, sizeMB } from "./format";
+import { dateTime, deploymentMeta, money, plural, shortId, sizeMB } from "./format";
+import { guessVolumeKind, volumeCostPerDay } from "./volume-kind";
 import { GONE, IN_PROGRESS } from "./health";
 import {
   PLAN_KINDS,
@@ -60,6 +61,7 @@ const DESTRUCTIVE: ReadonlySet<PlanKind> = new Set([
   "deployment.remove",
   "service.delete",
   "environment.delete",
+  "volume.delete",
   "project.scheduleDelete",
 ]);
 
@@ -391,6 +393,70 @@ async function draftEnvironmentDelete(account: AccountConfig, req: PlanRequest, 
   };
 }
 
+type BackupNode = { id: string; name: string | null; createdAt: string; expiresAt: string | null; usedMB: number | null };
+
+/** Delete one volume (and every byte on it). Target: the volume's id; environmentId is required. */
+async function draftVolumeDelete(account: AccountConfig, req: PlanRequest, project: ProjectDetail): Promise<Draft> {
+  if (req.targetIds.length !== 1 || !req.environmentId) throw new UserFacingError("Pick one volume.");
+  const env = project.environments.find((e) => e.id === req.environmentId);
+  if (!env) throw new UserFacingError("That environment isn't part of this project.");
+  const envView = await loadEnvironment(account, project.id, env.id, { fresh: true });
+  const vol = envView.volumes.find((v) => v.volume.id === req.targetIds[0]);
+  if (!vol) throw new UserFacingError("That volume isn't in this environment any more.");
+  const attached = envView.instances.find((i) => i.serviceId === vol.serviceId);
+  const running = !!attached && (attached.healthInfo.health === "live" || attached.healthInfo.health === "sleeping" || attached.healthInfo.health === "deploying");
+  const kind = guessVolumeKind({ image: attached?.source?.image ?? null, mountPath: vol.mountPath, hasRepo: !!attached?.source?.repo });
+
+  let backups: BackupNode[] | null = null;
+  try {
+    const r = await railwayRequest<{ volumeInstanceBackupList: BackupNode[] }>(account, D.VolumeInstanceBackupList, { volumeInstanceId: vol.id }, { fresh: true });
+    backups = r.volumeInstanceBackupList ?? [];
+  } catch {
+    backups = null; // Not available on every plan; the review says so.
+  }
+
+  const flags: PlanFlag[] = [{ tone: "danger", text: `${sizeMB(vol.currentSizeMB)} of data` }];
+  if (running) flags.push({ tone: "danger", text: `${attached!.serviceName} is running and uses it` });
+  if (vol.isPendingDeletion) flags.push({ tone: "info", text: "Already pending deletion" });
+  if (backups && backups.length > 0) flags.push({ tone: "warning", text: `${plural(backups.length, "backup")} on Railway` });
+
+  const perDay = volumeCostPerDay(vol.currentSizeMB);
+  return {
+    title: `Delete volume ${vol.volume.name}`,
+    verb: "Delete volume",
+    items: [
+      {
+        targetId: vol.volume.id,
+        label: vol.volume.name,
+        detail: `${attached ? `attached to ${attached.serviceName}` : "not attached"} · ${vol.mountPath} · ${sizeMB(vol.currentSizeMB)} used of ${sizeMB(vol.sizeMB)}`,
+        flags,
+        willRun: !vol.isPendingDeletion,
+        skipReason: vol.isPendingDeletion ? "Railway already has it queued for deletion." : undefined,
+      },
+    ],
+    impact: [
+      `Deletes the volume ${vol.volume.name} (${sizeMB(vol.currentSizeMB)} used) in ${env.name}, and every file on it (Railway volumeDelete). It most likely holds ${kind.label.toLowerCase()}: ${kind.contents}`,
+      `Storage charges for it stop: about ${money(perDay)} a day, ${money(perDay * 30)} a month at Railway's list price.`,
+      running
+        ? `${attached!.serviceName} is running and reads or writes ${vol.mountPath}. It loses that data and may fail until it gets a new volume.`
+        : attached
+          ? `${attached.serviceName} isn't running. It keeps its settings; if you start it again it begins with an empty ${vol.mountPath}.`
+          : "No service is attached to it.",
+      backups === null
+        ? "Railway didn't list backups for this volume (backups aren't available on every plan)."
+        : backups.length === 0
+          ? "There are no Railway backups of this volume."
+          : `Railway has ${plural(backups.length, "backup")} of it (newest ${backups[0]?.createdAt?.slice(0, 10) ?? "unknown"}). Railway's docs don't say backups outlive their volume, so don't count on them as your copy.`,
+    ],
+    recovery: `Railway queues a deleted volume for 48 hours and emails a link that restores it; after that the data is gone for good. To keep a copy, take it out first: ${kind.keepCopy}`,
+    phraseFor: () => vol.volume.name,
+    environmentId: env.id,
+    environmentName: env.name,
+    serviceId: attached?.serviceId,
+    serviceName: attached?.serviceName,
+  };
+}
+
 function draftProjectDelete(project: ProjectDetail): Draft {
   return {
     title: `Delete project ${project.name}`,
@@ -515,6 +581,7 @@ export async function createPlan(input: unknown): Promise<PlanView> {
   if (req.kind.startsWith("deployment.")) draft = await draftDeploymentPlan(account, req, project!);
   else if (req.kind === "service.delete") draft = await draftServiceDelete(account, req, project!);
   else if (req.kind === "environment.delete") draft = await draftEnvironmentDelete(account, req, project!);
+  else if (req.kind === "volume.delete") draft = await draftVolumeDelete(account, req, project!);
   else if (req.kind === "project.rename") draft = draftProjectRename(project!, req.newName!, await renameHints(account, project!));
   else if (req.kind === "project.scheduleDelete") draft = draftProjectDelete(project!);
   else draft = draftCancelDelete(req.projectId, projectName);
@@ -618,6 +685,11 @@ async function runMutation(account: AccountConfig, plan: StoredPlan, targetId: s
       expectTrue(r.environmentDelete, "environmentDelete");
       return undefined;
     }
+    case "volume.delete": {
+      const r = await railwayRequest<{ volumeDelete: boolean }>(account, D.VolumeDelete, { volumeId: targetId });
+      expectTrue(r.volumeDelete, "volumeDelete");
+      return "Queued for deletion. Railway emails a link that restores it within 48 hours.";
+    }
     case "project.rename": {
       if (!plan.proposedName) throw new Error("Missing name.");
       const r = await railwayRequest<{ projectUpdate: { id: string; name: string } }>(account, D.ProjectUpdate, {
@@ -673,6 +745,14 @@ async function recheckItem(
     const env = project?.environments.find((e) => e.id === targetId);
     if (!env) return "The environment no longer exists.";
     if (env.id === project?.primaryEnvironmentId) return "It is now the project's primary environment.";
+    return null;
+  }
+  if (kind === "volume.delete") {
+    if (!plan.environmentId) return "Missing environment.";
+    const envView = await loadEnvironment(account, plan.projectId, plan.environmentId, { fresh: true });
+    const vol = envView.volumes.find((v) => v.volume.id === targetId);
+    if (!vol) return "The volume is no longer in that environment.";
+    if (vol.isPendingDeletion) return "Railway already has it queued for deletion.";
     return null;
   }
   if (kind === "project.rename") {

@@ -36,6 +36,8 @@ export function StoppedBillingAlert({ summary }: { summary: StoppedBilling }) {
       // Storage blocked: still show it, once per page load.
     }
     if (seen === seenValue) return;
+    // Arriving at the bill list on purpose (a tile or the assistant): don't cover it with the pop-up.
+    if (window.location.hash === "#still-on-bill") return;
     setOpen(true);
   }, [summary.services, seenValue]);
 

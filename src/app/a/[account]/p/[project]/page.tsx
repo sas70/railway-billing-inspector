@@ -1,9 +1,11 @@
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { ActionButton } from "@/components/ActionReview";
+import { VolumeInsight } from "@/components/VolumeInsight";
 import { DescribeButton } from "@/components/DescribeSummaries";
 import { ErrorState } from "@/components/ErrorState";
 import { Icon } from "@/components/Icon";
@@ -29,6 +31,8 @@ import {
 } from "@/components/ui";
 import { getAccount, isMockMode, isProtectedProject, workspaceAllowed } from "@/lib/config";
 import { isReadOnly } from "@/lib/write-mode";
+import { savedVolumeNote, volumeNotesAvailable } from "@/lib/volume-insight";
+import { guessVolumeKind, volumeCostPerDay } from "@/lib/volume-kind";
 import { dateShort, deploymentMeta, money, plural, relative, sizeMB } from "@/lib/format";
 import {
   loadEnvironment,
@@ -90,6 +94,9 @@ export default async function ProjectPage({ params, searchParams }: Props) {
   const projected = estimateResult?.ok ? estimateResult.value.byProject[project.id] : undefined;
   const envView = envResult?.ok ? envResult.value : null;
   const readOnly = await isReadOnly();
+  const volumeNotes = new Map(
+    await Promise.all((envView?.volumes ?? []).map(async (v) => [v.volume.id, await savedVolumeNote(v.volume.id)] as const)),
+  );
   const locked = isProtectedProject(project);
   const destructiveLock = readOnly ? "Read-only — enable Write mode in the header" : locked ? "This project is protected (PROTECTED_PROJECTS)" : undefined;
   const base = `/a/${account.key}/p/${project.id}`;
@@ -363,7 +370,10 @@ export default async function ProjectPage({ params, searchParams }: Props) {
 
       {envView && envView.volumes.length > 0 && (
         <Card>
-          <CardHeader title={`Volumes in ${envView.name}`} subtitle="Volumes bill for storage ($0.15 / GB / month) until they are deleted, even when nothing is running." />
+          <CardHeader
+            title={`Volumes in ${envView.name}`}
+            subtitle="Volumes bill for storage ($0.15 / GB / month) until they are deleted, even when nothing is running. Railway can't list a volume's files, so “What's in it?” is a best guess from the image, mount path and code."
+          />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-sm">
               <thead>
@@ -376,8 +386,13 @@ export default async function ProjectPage({ params, searchParams }: Props) {
                 </tr>
               </thead>
               <tbody>
-                {envView.volumes.map((v) => (
-                  <tr key={v.id} className="border-b border-line last:border-b-0">
+                {envView.volumes.map((v) => {
+                  const inst = envView.instances.find((i) => i.serviceId === v.serviceId);
+                  const running = !!inst && (inst.healthInfo.health === "live" || inst.healthInfo.health === "sleeping" || inst.healthInfo.health === "deploying");
+                  const kind = guessVolumeKind({ image: inst?.source?.image ?? null, mountPath: v.mountPath, hasRepo: !!inst?.source?.repo });
+                  return (
+                  <Fragment key={v.id}>
+                  <tr className="border-b-0">
                     <td className="px-4 py-2">
                       {v.volume.name}
                       {v.isPendingDeletion && <Badge tone="danger">pending deletion</Badge>}
@@ -387,7 +402,43 @@ export default async function ProjectPage({ params, searchParams }: Props) {
                     <td className="px-2 py-2 text-right tabular">{sizeMB(v.currentSizeMB)}</td>
                     <td className="px-4 py-2 text-right tabular text-ink-2">{sizeMB(v.sizeMB)}</td>
                   </tr>
-                ))}
+                  <tr className="border-b border-line last:border-b-0">
+                    <td colSpan={5} className="px-4 pb-4 pt-1">
+                      <details className="group rounded-lg border border-line bg-surface-2/40 px-3 py-2" open={!running && v.currentSizeMB > 0}>
+                        <summary className="cursor-pointer select-none text-sm font-medium">
+                          What&apos;s in it? <span className="font-normal text-ink-2">· {kind.label}</span>
+                        </summary>
+                        <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                          <div className="min-w-0 flex-1">
+                            <VolumeInsight
+                              request={{ accountKey: account.key, projectId: project.id, environmentId: envView.id, volumeId: v.volume.id }}
+                              kind={kind}
+                              usedMB={v.currentSizeMB}
+                              perDay={volumeCostPerDay(v.currentSizeMB)}
+                              attachedName={inst?.serviceName ?? null}
+                              running={running}
+                              initialNote={volumeNotes.get(v.volume.id) ?? null}
+                              aiAvailable={volumeNotesAvailable()}
+                            />
+                          </div>
+                          <div className="shrink-0">
+                            <ActionButton
+                              label="Delete volume…"
+                              icon="trash"
+                              tone="danger"
+                              size="md"
+                              disabled={!!destructiveLock || v.isPendingDeletion}
+                              disabledReason={v.isPendingDeletion ? "Railway already has it queued for deletion" : destructiveLock}
+                              request={{ accountKey: account.key, kind: "volume.delete", projectId: project.id, environmentId: envView.id, targetIds: [v.volume.id] }}
+                            />
+                          </div>
+                        </div>
+                      </details>
+                    </td>
+                  </tr>
+                  </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
