@@ -4,6 +4,8 @@ import { KEEP_PAGES_SECONDS } from "./src/lib/preload";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Hide the Next.js "N" badge and its "Rendering…" status in npm run dev. Build errors still show.
+  devIndicators: false,
   // This folder is the project root, even when a parent folder has its own package-lock.json.
   turbopack: { root: process.cwd() },
   // Native or large server-only packages for the search index: load them from node_modules at

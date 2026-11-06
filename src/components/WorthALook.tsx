@@ -24,6 +24,15 @@ export function WorthALook({ candidates, structure, renderedAt }: { candidates: 
   const [range, setRange] = useState<WorthRange>(DEFAULT_WORTH_RANGE);
   const [expanded, setExpanded] = useState(false);
   const [billExpanded, setBillExpanded] = useState(false);
+  // The Overview's "Off, but still charging" tile links to #still-on-bill: open the whole list.
+  useEffect(() => {
+    const open = () => {
+      if (window.location.hash === "#still-on-bill") setBillExpanded(true);
+    };
+    open();
+    window.addEventListener("hashchange", open);
+    return () => window.removeEventListener("hashchange", open);
+  }, []);
 
   useEffect(() => {
     try {
@@ -113,7 +122,7 @@ export function WorthALook({ candidates, structure, renderedAt }: { candidates: 
         <section aria-labelledby="still-on-bill" className="border-t border-line">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1 px-5 pt-4 pb-1">
             <div className="min-w-0">
-              <h3 id="still-on-bill" className="flex items-center gap-2 text-sm font-semibold">
+              <h3 id="still-on-bill" className="flex scroll-mt-24 items-center gap-2 text-sm font-semibold">
                 Still on this period&apos;s bill <Badge>{billing.length}</Badge>
               </h3>
               <p className="mt-1 text-xs leading-relaxed text-ink-2">

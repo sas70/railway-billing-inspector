@@ -48,6 +48,7 @@ export function ServicesToolbar({
           [
             ["all", "All"],
             ["online", "Online"],
+            ["attention", "Needs attention"],
             ["offline", "Offline"],
             ...(stoppedCount > 0 || filter === "stopped" ? ([["stopped", `Stopped, still billing (${stoppedCount})`]] as const) : []),
           ] as const

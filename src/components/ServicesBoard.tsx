@@ -33,10 +33,8 @@ export function ServicesBoard({
   useLayoutEffect(() => {
     const nodes = document.querySelectorAll<HTMLTableRowElement>("[data-service-row]");
     for (const node of nodes) {
-      const online = node.dataset.online === "1";
-      const stopped = node.dataset.stopped === "1";
       const hay = node.dataset.search ?? "";
-      const statusOk = filter === "all" || (filter === "stopped" ? stopped : (filter === "online") === online);
+      const statusOk = filter === "all" || (node.dataset.status ?? "").split(" ").includes(filter);
       node.hidden = !(statusOk && (!q || hay.includes(q)));
     }
   });
@@ -44,7 +42,9 @@ export function ServicesBoard({
   const scope =
     filter === "online"
       ? "online services"
-      : filter === "offline"
+      : filter === "attention"
+        ? "services that need attention"
+        : filter === "offline"
         ? "offline services"
         : filter === "stopped"
           ? "stopped services Railway still bills"

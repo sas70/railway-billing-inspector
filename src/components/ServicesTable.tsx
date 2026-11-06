@@ -15,6 +15,7 @@ import { railwayServiceUrl } from "@/lib/railway-links";
 import {
   DEFAULT_SERVICE_SORT,
   nextServiceSort,
+  rowStatusTags,
   sortServiceRows,
   type ServiceSort,
   type ServiceSortKey,
@@ -114,8 +115,7 @@ export function ServicesTable({ rows, readOnly }: { rows: ServiceCatalogRow[]; r
                   <tr
                     key={row.key}
                     data-service-row
-                    data-online={row.online ? "1" : "0"}
-                    data-stopped={row.stoppedDeploymentIds.length > 0 ? "1" : "0"}
+                    data-status={rowStatusTags(row).join(" ")}
                     data-search={search}
                     className="border-b border-line last:border-b-0 hover:bg-surface-2"
                   >
