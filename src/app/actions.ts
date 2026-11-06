@@ -17,6 +17,7 @@ import { friendlyError, loadDeployment, loadLogs, loadProject } from "@/lib/rail
 import { clearCache } from "@/lib/railway/client";
 import type { LogLine } from "@/lib/railway/types";
 import type { SummaryJob } from "@/lib/code/ai-summary";
+import type { ChatReply } from "@/lib/chat/types";
 import type { VolumeNote } from "@/lib/volume-insight";
 import type { IndexJob } from "@/lib/search-index/build";
 import type { IndexStats } from "@/lib/search-index/store";
@@ -212,6 +213,16 @@ export async function explainVolumeAction(input: unknown): Promise<ActionResult<
   try {
     const { explainVolume } = await import("@/lib/volume-insight");
     return { ok: true, data: await explainVolume(input) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** The assistant: answers about the user's Railway projects from the dashboard's data. Changes nothing. */
+export async function chatAction(messages: unknown): Promise<ActionResult<ChatReply>> {
+  try {
+    const { answerChat } = await import("@/lib/chat/answer");
+    return { ok: true, data: await answerChat(messages) };
   } catch (error) {
     return { ok: false, error: toMessage(error) };
   }
