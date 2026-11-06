@@ -259,17 +259,20 @@
   const REPO = "sas70/railway-billing-inspector";
 
   const FEATURES = [
-    { icon: "grid", title: "Overview", text: "Every workspace and project at a glance: health, cost so far and projected, plus a list of crashed services, failed deploys and forgotten PR environments." },
-    { icon: "clock", title: "Worth a look, by time", isNew: true, text: "Show only what happened today, this week, this month or this year. Charges get their own list, saying whether each is still charging or stopped earlier." },
-    { icon: "wallet", title: "Off, but still charging", isNew: true, text: "Projects with nothing running that Railway charged in the last 2 days, with the cost per day and what it's for, plus a summary of the bill by status and by resource." },
-    { icon: "clock", title: "Tabs stay loaded", isNew: true, text: "The other tabs load in the background and come up instantly. One Refresh button reads everything from Railway again." },
-    { icon: "server", title: "Services", text: "Every service in one sortable table, newest deploy first, with Turn on / Turn off and bulk on/off, each reviewed first." },
+    { icon: "text", title: "Ask about your projects", isNew: true, text: "A bubble on every page with four quick actions and answers from your dashboard's data that link to the right screen. Read-only: it never changes anything." },
+    { icon: "wallet", title: "Stopped, but still billed", isNew: true, text: "Railway can stop a deployment yet keep billing its memory. A pop-up and banner flag them, and Remove stopped clears them after a review, with a checkbox per item." },
+    { icon: "folder", title: "What's in that volume?", isNew: true, text: "A best guess at what a billing volume holds, from its image, mount path and code, with Claude's explanation, and Delete volume after a review." },
+    { icon: "pointer", title: "Every number opens its list", isNew: true, text: "Click an Overview tile to see exactly what it counts: live, needs attention, offline, or off but still charging." },
+    { icon: "grid", title: "Overview", text: "Every workspace and project at a glance: health, cost so far and projected, plus a list of crashed services, failed deploys and forgotten PR environments, filtered by time." },
+    { icon: "wallet", title: "Off, but still charging", text: "Projects with nothing running that Railway charged in the last 2 days, with the cost per day and what it's for, plus a summary of the bill by status and by resource." },
+    { icon: "clock", title: "Tabs stay loaded", text: "What was read from Railway is saved on disk and reused until you press Refresh, so tabs come up instantly, even after a restart." },
+    { icon: "server", title: "Services", text: "Every service in one sortable table, filtered by online, needs attention, offline or stopped, with bulk actions that are reviewed first." },
     { icon: "folder", title: "Project and service pages", text: "Cost by service and resource, environments, volumes, CPU, memory and egress charts, deployment history and logs." },
     { icon: "wallet", title: "Billing and cost history", text: "Usage against your plan, projected cost, invoices, and a 7- or 30-day comparison of what changed." },
-    { icon: "search", title: "Search and AI summaries", text: "Find an app by what it does. Claude summarizes each repo's code once and only re-runs when the code changes." },
-    { icon: "pointer", title: "Hover summaries", isNew: true, text: "Hover any project or service name to see what its code does, without leaving the list." },
-    { icon: "text", title: "Railway descriptions", isNew: true, text: "Copy each app's saved summary into its Railway project description, after one review." },
-    { icon: "pencil", title: "Rename projects", isNew: true, text: "Swap Railway's random names like steadfast-fascination for names that say what each app does, several at once, with suggestions from each app's code summary." },
+    { icon: "search", title: "Search and AI summaries", text: "Find an app by keyword or topic from an index on your machine. Claude summarizes each repo's code, in the background for new ones, and only re-runs when the code changes." },
+    { icon: "pointer", title: "Hover summaries", text: "Hover any project or service name to see what its code does, without leaving the list." },
+    { icon: "text", title: "Railway descriptions", text: "Copy each app's saved summary into its Railway project description, after one review." },
+    { icon: "pencil", title: "Rename projects", isNew: true, text: "Swap Railway's random names like steadfast-fascination for names that say what each app does: a green check renames one row, or select all and review them together." },
     { icon: "shield", title: "Safe changes", text: "Every change is reviewed, approved, re-checked right before it runs and logged. Read-only until you turn on Write mode." },
     { icon: "laptop", title: "Runs on your machine", text: "Local-only by default and tokens never reach the browser. The demo runs on fake data and needs no token." },
   ];
@@ -282,13 +285,8 @@
 
   const ROADMAP = [
     {
-      id: "assistant-guide", stage: "now", title: "AI assistant: guide",
-      summary: "Ask in plain words, like “which apps cost the most?” or “I want to summarize my apps”, and get an answer or a link to the page that does it.",
-      details: ["Answers from your dashboard's data: projects, costs, status and summaries", "Points you to the right page", "Read-only: it can't change anything"],
-    },
-    {
-      id: "assistant-confirm", stage: "next", title: "AI assistant: propose and confirm",
-      summary: "The assistant drafts the change and shows the same review the buttons show. Nothing runs until you click Confirm.",
+      id: "assistant-confirm", stage: "now", title: "AI assistant: propose and confirm",
+      summary: "Step 1 is out: the Ask bubble answers questions and links to the right screen. Next, the assistant drafts the change and shows the same review the buttons show. Nothing runs until you click Confirm.",
       details: ["Write mode, protected projects and the re-check before each change still apply", "Destructive actions still need their typed phrase", "Every change goes in the audit log"],
     },
     {
