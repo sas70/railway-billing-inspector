@@ -26,6 +26,8 @@ const KIND_LABEL: Record<AuditKind, string> = {
   "project.describe": "Set project description",
   "project.scheduleDelete": "Schedule project deletion",
   "project.cancelDelete": "Cancel project deletion",
+  "workspace.usageLimit": "Set compute usage limit",
+  "workspace.agentLimit": "Set agent usage limit",
 };
 
 const OUTCOME_STYLE = {

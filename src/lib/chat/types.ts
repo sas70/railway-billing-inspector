@@ -53,5 +53,6 @@ export const APP_ROUTES = [
   { path: "/search", what: "search projects by keyword or topic across READMEs, summaries and code" },
   { path: "/billing", what: "usage vs plan, projected bill, cost by status and resource per workspace" },
   { path: "/billing/history", what: "daily cost by project" },
+  { path: "/limits", what: "each workspace's usage limits (compute email alert and hard limit, Railway Agent limit), with a reviewed form to set or change them" },
   { path: "/audit", what: "the log of every change made from this dashboard" },
 ] as const;

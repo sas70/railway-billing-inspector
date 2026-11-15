@@ -6,8 +6,11 @@ import path from "node:path";
 import { isMockMode } from "./config";
 import type { PlanKind } from "./plan-types";
 
-/** Plan kinds, plus changes made by the description review (describe.ts). */
-export type AuditKind = PlanKind | "project.describe";
+/**
+ * Plan kinds, plus changes made by the description review (describe.ts) and the workspace usage
+ * limit review (limits.ts). Workspace-level events leave projectId and projectName empty.
+ */
+export type AuditKind = PlanKind | "project.describe" | "workspace.usageLimit" | "workspace.agentLimit";
 
 /**
  * Append-only audit trail of every approved action, one JSON object per line.

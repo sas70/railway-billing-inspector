@@ -9,7 +9,8 @@ Everything the dashboard does, how to run it, how approvals work, how the number
 - **Services.** Every service across every workspace. Default sort is **newest deploy first**. Click a column (service, status, environment, latest deploy, this period, expected) to sort. Filter with **All / Online / Needs attention / Offline**, plus **Stopped, still billing** when there are any; each filter has its own link (`/services?show=online`, `attention`, `offline`, `stopped`). Online is live, sleeping or deploying; Needs attention is crashed, failed, or live with a failed newest deploy; Offline is nothing live and nothing broken. **Turn all projects ON / OFF** and **Remove stopped** act in bulk; the review has a checkbox per item and **Select all**, and the phrase to type counts only what's ticked. Each row has a red **Open in Railway** icon next to the service name that opens that service in Railway (`/project/…/service/…`). Hover over a service name to see what its repo does.
 - **Project.** Cost by service and by resource, a service table for each environment, volumes, a red **Open in Railway** link, and a danger zone. Each volume has a **What's in it?** panel and a **Delete volume** button (see [below](#whats-in-a-volume-and-deleting-one)).
 - **Service.** CPU, memory and egress charts (1 h / 24 h / 7 d), the live deployment (with a warning and a **Remove stopped deployment** button when Railway stopped it but still bills it), the deployment history with bulk actions and logs, and a red **Open in Railway** link for that service.
-- **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits, the next invoice, invoices with PDF links, and cost by project and resource. **Where the money went** shows two donuts per workspace: the period's cost by each project's status today (running now, off but still charging, off and charged earlier, deleted) and by resource (CPU, memory, egress, volumes, backups). Also available for the previous period.
+- **Billing.** Per workspace: usage so far against what your plan includes, projected usage, overage and period cost, credit balance, usage limits (with a **Change** link to Limits), the next invoice, invoices with PDF links, and cost by project and resource. **Where the money went** shows two donuts per workspace: the period's cost by each project's status today (running now, off but still charging, off and charged earlier, deleted) and by resource (CPU, memory, egress, volumes, backups). Also available for the previous period.
+- **Limits.** Each workspace's spending limits: compute usage so far against the email alert and hard limit, with the projected bill marked on the meter, and Railway Agent spend against its own limit. **Change limits** opens a form; see [Usage limits](#usage-limits) below.
 - **Cost history.** Open **Billing → Cost history** to compare the last 7 or 30 complete UTC days with the preceding equal window. Projects are ranked by absolute spending change, with dollar and percentage differences, increase/decrease filters, search, and expandable resource changes. Deleted projects are included; workspaces missing either range are excluded from both totals. This compares metered resource costs at current list prices, excluding plan fees, included usage, credits and tax. Today is excluded to avoid comparing a partial day.
 - **Moving between tabs.** Each page keeps what it read from Railway, so going back and forth between tabs (or using the browser's Back button) shows the saved copy instead of reading Railway again. After the first page opens, the other tabs and last billing period are read in the background. **Refresh**, at the top right, throws away every saved copy and reads everything again; the label next to it says how old what you're looking at is. There is no time limit: what was read is saved on disk (`data/railway-cache.sqlite`, git-ignored), so even after a restart pages come up straight away. Saved copies are also thrown away after any change you make from the dashboard, so you never see a project you just deleted.
 - **Assistant.** The **Ask** bubble at the bottom right of every page opens a panel with four quick actions (Remove stopped deployments, Rename projects, Off but still charging, Needs attention) and a chat. Ask in plain words, like "what's still charging me?", "which projects need attention?" or a project's name. Answers come from the same saved reads the pages use (projects, status, costs this period and over the last 2 days, stopped deployments, saved summaries), so a question normally costs no Railway requests, and they link to the project, service or filtered list. It never sees variables, tokens or logs, and it never changes anything: links lead to the screens where each change is reviewed. With `ANTHROPIC_API_KEY`, Claude answers, limited to your Railway projects and this dashboard; without a key, and on the demo, built-in answers cover costs, what's still charging, stopped deployments, what's broken, renaming and single projects. The conversation is kept for the browser tab; press **Refresh** for current numbers.
@@ -59,7 +60,7 @@ The first time the dashboard opens with your token, it builds a search index in 
 Every change, from restarting a deployment to deleting a project, goes through the same path:
 
 1. **Review.** When you click an action, the server re-reads the current state from Railway and builds a *plan*. The plan lists exactly which items will change and their current status. It flags risk (for example, **Live: serving now** or an attached volume), shows which items will be skipped and why, explains what will happen and how to undo it, and says what the change does to your costs. Nothing changes at this step.
-2. **Approve.** Destructive actions only run after you type a phrase: `REMOVE 3`, or the exact service, environment or project name. Non-destructive actions such as Restart, Redeploy, Roll back or Cancel build need a single confirm click.
+2. **Approve.** Destructive actions only run after you type a phrase: `REMOVE 3`, or the exact service, environment or project name. A usage-limit change that can take services offline or removes the hard limit asks for `SET HARD LIMIT $<amount>` or `REMOVE HARD LIMIT`. Non-destructive actions such as Restart, Redeploy, Roll back or Cancel build need a single confirm click.
 3. **Execute exactly that plan.**
    - A plan is single-use and expires after 10 minutes.
    - It only runs the items you reviewed, using the IDs the server checked, not whatever the browser sends.
@@ -115,6 +116,24 @@ A volume bills for its used storage ($0.15 / GB / month) every day until it's de
 - **Explain with Claude** (needs `ANTHROPIC_API_KEY`) sends the facts (image, mount path, size, the other services in the environment, saved summaries and the attached repo's key files) and gets back a short explanation with likely contents, a confidence level and what would be lost. It's labeled as an inference, saved under `data/volume-notes/`, and flagged when the volume's size has changed since.
 - **Delete volume…** opens a review: the size, the cost it saves per day and month, what it most likely holds, whether a running service uses it, the Railway backups it has, and how to keep a copy first. Type the volume name to approve. Railway queues a deleted volume for 48 hours and emails a link that restores it; after that the data is gone. Railway's docs don't say backups outlive their volume, so don't count on them as your copy.
 
+### Usage limits
+
+Railway sets spending limits **per workspace**, never per project: every project in the workspace counts toward them. There are two, tracked apart:
+
+- **Compute.** An email alert (Railway's "custom email alert") and a hard limit, in whole dollars. The alert is $5 or more, or none; the hard limit is $10 or more, at least the alert, or none. Railway emails at 75%, 90% and 100% of the hard limit, and at the hard limit it takes **every service in the workspace offline**. Railway shows the projected bill next to it and may act on that projection, so the dashboard treats a hard limit at or below the projection like one at or below usage so far.
+- **Railway Agent.** Its own email alert and hard limit, in dollars and cents. Reaching it pauses only the agent; services keep running. Railway can't remove it; a $0 hard limit blocks the agent. Hobby defaults to $5 and Pro to $20.
+
+**Limits** (in the header, or **Change** next to Usage limit on Billing) shows both for every workspace, with a status: *Within limit*, *Past 75% of limit*, *Projected over limit*, *At hard limit* or *No hard limit*. **Change limits** opens a form that checks Railway's rules as you type, suggests a hard limit (the projected bill + 25%, rounded up to $5), and previews what the review will flag. Leave a compute field blank for none.
+
+The review re-reads usage, the projected bill and the current limits from Railway, then:
+
+- **Typed phrase** when the change can stop services or removes the cap: a new hard limit at or below usage so far or the projected bill (`SET HARD LIMIT $10`), a lower or new hard limit when the projection can't be read, or removing the hard limit (`REMOVE HARD LIMIT`).
+- **One confirm click** for everything else: raising the hard limit, changing the alert, any agent change. A hard limit less than 15% above the projection is flagged, and so is an agent limit that would pause the agent.
+
+Right before the change is sent, the limits and usage are read again. If the limits changed since the review, or usage moved so that a change approved with a click could now stop services, that limit is skipped and you review again. Railway only answers yes or no, so the dashboard reads the limit back and reports success only when Railway shows the new values (otherwise **unknown**, check Railway's Usage page). Changes need admin access to the workspace's billing.
+
+What's sent mirrors the Railway CLI (`railway usage limit set`): `usageLimitSet` always gets both values (alert `0` means none, hard limit `null` means none), clearing both uses `usageLimitRemove`, and a compute hard limit of `0` is never sent.
+
 ### What each action does
 
 | Action | Railway API | Effect on cost | Undo |
@@ -130,6 +149,8 @@ A volume bills for its used storage ($0.15 / GB / month) every day until it's de
 | **Rename project** (Overview) | `projectUpdate` | none | Rename it again |
 | **Rename projects** (several at once) | `projectUpdate` (name only), one per project | none | Rename them again; the previous names are in the audit log |
 | **Copy summaries into descriptions** (Search, project page) | `projectUpdate` (description only) | none | Edit or clear it in Railway; the previous text is in the audit log |
+| **Set usage limits** (Limits page), compute | `usageLimitSet` (alert and hard limit) or `usageLimitRemove` (both cleared) | Caps compute spend: at the hard limit Railway takes the workspace's services offline. Removing it removes the cap. | Change them again; the previous values are in the audit log. Raising the limit above usage brings stopped services back (redeploy any that stay down). |
+| **Set usage limits** (Limits page), Railway Agent | `agentUsageLimitSet` | Caps agent spend; reaching it pauses only the agent | Change it again; the previous values are in the audit log |
 | **Delete project** | `projectScheduleDelete` | Railway deletes the project after a **48-hour grace period** | Cancel within 48 h (Audit log page or Railway), which calls `projectScheduleDeleteCancel` |
 
 > Railway keeps removed deployments in the history list. Removing a deployment that isn't running doesn't lower your bill: costs come from running services (CPU/RAM), volume storage and egress. To save money, take idle services offline, delete PR environments, or delete projects you no longer need.
@@ -188,7 +209,7 @@ These use a 30-day month (43,200 minutes). Other inputs:
 
 Run `npm test` for all unit tests: `test:cost-history` (date windows, project and resource deltas, missing data, deleted projects, zero baselines), `test:descriptions` (how summaries become Railway descriptions: joining, de-duplicating, trimming), `test:worth-a-look` (the Overview's time filter) `test:names` (rename suggestions: slugs, spotting Railway's random names, keeping suggestions unique), `test:preload` (which tabs load in the background) and `test:index` (search index: which files are read, chunking, query parsing, ranking).
 
-`npm test` also covers the Services filters (`test-service-filters`), which repos get summarized on their own (`test-auto-summary`), the volume guesses and their cost (`test-volume-kind`), and the assistant's built-in answers and message limits (`test-chat`).
+`npm test` also covers the Services filters (`test-service-filters`), which repos get summarized on their own (`test-auto-summary`), the volume guesses and their cost (`test-volume-kind`), and the assistant's built-in answers and message limits (`test-chat`), and usage limits (`test-limits`: Railway's rules, when a typed phrase is needed, what's sent, and the review → approve → audit engine with changed limits, moved usage, expiry, replays and audit failures).
 
 `npm run test:safety` exercises the approval engines with mocked Railway I/O (including concurrent approvals, expiration, changed state, workspace restrictions, and audit-write failures), persisted cache isolation, and index file boundaries. GitHub Actions runs tests, type checking, and a mock-mode production build on pushes and pull requests.
 
@@ -199,7 +220,7 @@ Code indexing excludes common credential files (including `.env*`, `.npmrc`, and
 npm run check:queries
 ```
 
-This validates every GraphQL operation the dashboard sends (28 of them) against Railway's **live** schema, using introspection, so no token is needed. It also warns about deprecated fields. Run it if something starts failing after a Railway update.
+This validates every GraphQL operation the dashboard sends (32 of them) against Railway's **live** schema, using introspection, so no token is needed. It also warns about deprecated fields. Run it if something starts failing after a Railway update.
 
 ---
 
@@ -212,6 +233,7 @@ src/
     rename/page.tsx                  Rename several projects at once
     services/page.tsx                Services catalog (sortable, Railway links)
     billing/page.tsx                 Billing (current / previous period)
+    limits/page.tsx                  Usage limits per workspace (compute and Railway Agent)
     a/[account]/p/[project]/page.tsx Project drill-down
     a/[account]/p/[project]/s/[service]/page.tsx   Service: metrics, deployments, logs
     audit/page.tsx, audit/export/route.ts          Audit log + CSV export
@@ -220,6 +242,8 @@ src/
     plans.ts                         Approval engine (review, gating, phrase, expiry, re-check, audit)
     describe.ts                      Same review → approve → re-check → audit path for copying summaries into descriptions
     rename.ts                        The same path for renaming several projects at once, plus the rename table's rows
+    limits.ts                        The same path for workspace usage limits, plus the Limits page's rows
+    limit-rules.ts                   Railway's limit rules, when a phrase is needed, what's sent (tested by test-limits)
     project-description.ts           Builds and trims description text from saved summaries (tested by test:descriptions)
     name-suggest.ts                  Rename suggestions: slugs from summary or repo names, kept unique (tested by test:names)
     code/blurbs.ts                   Hover-card text per repo, from local files only (saved summary, else a local clone's README)
@@ -249,6 +273,7 @@ scripts/check-queries.mjs            Live schema validation
 - Metrics are sampled (1 min for 1 h, 15 min for 24 h, 1 h for 7 d), so short spikes can be averaged out.
 - Railway can't list a volume's files, so **What's in it?** and Claude's explanation are educated guesses from the image, mount path and code. Check the data yourself before deleting anything you might need.
 - The assistant answers from what the dashboard last read from Railway. Press **Refresh** for current numbers.
+- Railway has no per-project usage limit, so neither does the dashboard: limits cover a whole workspace. The projected bill is Railway's estimate assuming current usage continues.
 - Egress shown on the charts is per sample interval. Billing uses Railway's metered total.
 
 ---

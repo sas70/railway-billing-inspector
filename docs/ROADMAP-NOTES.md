@@ -42,6 +42,7 @@ Off, but still charging (from the last 2 days' real charges); bill summary by st
 
 ## Decided
 
+- Usage limits are Railway's own, per workspace (compute alert and hard limit, Railway Agent limit). No dashboard-only per-project budgets: Railway wouldn't enforce them. A typed phrase only when a change can stop services or removes the hard limit.
 - Votes on the roadmap use GitHub issues, not a database.
 - Rename suggestions are slugs (`acme-status-page`).
 - The assistant is a new way into the existing review → confirm → audit engine, never a separate way to change Railway.

@@ -9,6 +9,7 @@ import { createBulkPlan, executeBulkPlan } from "@/lib/bulk";
 import type { BulkExecutionView, BulkPlanView } from "@/lib/bulk-types";
 import { createDescribePlan, executeDescribePlan } from "@/lib/describe";
 import type { DescribeExecutionView, DescribePlanView } from "@/lib/describe-types";
+import type { LimitExecutionView, LimitPlanView } from "@/lib/limits-types";
 import type { ActionResult, ExecutionView, PlanView } from "@/lib/plan-types";
 import { createPlan, executePlan, UserFacingError } from "@/lib/plans";
 import { createRenamePlan, executeRenamePlan } from "@/lib/rename";
@@ -87,6 +88,29 @@ export async function createRenamePlanAction(request: unknown): Promise<ActionRe
 export async function executeRenamePlanAction(planId: unknown): Promise<ActionResult<RenameExecutionView>> {
   try {
     return { ok: true, data: await executeRenamePlan(planId) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/**
+ * Review a workspace's usage limits change ({ accountKey, workspaceId, compute?, agent? }).
+ * Reads Railway fresh; changes nothing.
+ */
+export async function createLimitPlanAction(request: unknown): Promise<ActionResult<LimitPlanView>> {
+  try {
+    const { createLimitPlan } = await import("@/lib/limits");
+    return { ok: true, data: await createLimitPlan(request) };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** Run a reviewed limits change, with the exact phrase when the review asked for one. */
+export async function executeLimitPlanAction(planId: unknown, phrase: unknown): Promise<ActionResult<LimitExecutionView>> {
+  try {
+    const { executeLimitPlan } = await import("@/lib/limits");
+    return { ok: true, data: await executeLimitPlan(planId, phrase) };
   } catch (error) {
     return { ok: false, error: toMessage(error) };
   }

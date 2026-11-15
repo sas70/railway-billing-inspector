@@ -72,6 +72,18 @@ export type WorkspaceBillingResult = {
   workspace: WorkspaceBasics & { customer: CustomerBilling };
 };
 
+export type AgentUsageResult = {
+  agentUsage: {
+    totalUsedCents: number;
+    /** null or 0: no email alert. */
+    softLimitCents: number | null;
+    /** 0 blocks the agent; null: no limit. */
+    hardLimitCents: number | null;
+    hasCustomHardLimit: boolean | null;
+    billingPeriodEnd: string;
+  };
+};
+
 export type Invoice = {
   invoiceId: string;
   periodStart: string;
