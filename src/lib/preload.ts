@@ -26,3 +26,29 @@ export function routesToPreload(pathname: string, search = ""): string[] {
 
 /** Sent by the Refresh button once the fresh page is on screen, so the other tabs are read again. */
 export const REFRESHED_EVENT = "rbi:refreshed";
+
+// ── Background refresh ──────────────────────────────────────────────────────
+// Refresh (and the automatic one) reads Railway again without throwing the saved copy away first:
+// the pages stay on screen from the saved copy while each tab is rendered again in the background
+// with REFRESH_HEADER, then the new reads replace the old ones in one go and the page swaps.
+
+/** Sent with each background render so its Railway reads go to the refresh, not the saved copy. */
+export const REFRESH_HEADER = "x-rbi-refresh";
+
+/** Opening the dashboard refreshes in the background when the saved copy is older than this. */
+export const AUTO_REFRESH_AFTER_MS = 60 * 60_000;
+
+/** If an automatic refresh didn't finish, don't start another one on the next page for this long. */
+export const AUTO_RETRY_GAP_MS = 10 * 60_000;
+
+/** A whole refresh stops waiting after this; whatever was read by then is kept. */
+export const REFRESH_TIMEOUT_MS = 3 * 60_000;
+
+/** Tabs rendered at the same time during a refresh (each is several Railway reads). */
+export const REFRESH_CONCURRENCY = 2;
+
+/** What a refresh renders again: the page on screen first, then every other tab. */
+export function refreshRoutes(pathname: string, search = ""): string[] {
+  const here = search ? `${pathname}?${search.replace(/^\?/, "")}` : pathname;
+  return [here, ...PRELOAD_ROUTES.filter((route) => route !== here)];
+}

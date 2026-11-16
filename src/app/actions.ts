@@ -15,7 +15,7 @@ import { createPlan, executePlan, UserFacingError } from "@/lib/plans";
 import { createRenamePlan, executeRenamePlan } from "@/lib/rename";
 import type { RenameExecutionView, RenamePlanView } from "@/lib/rename-types";
 import { friendlyError, loadDeployment, loadLogs, loadProject } from "@/lib/railway/api";
-import { clearCache } from "@/lib/railway/client";
+import { clearCache, type RefreshOutcome } from "@/lib/railway/client";
 import type { LogLine } from "@/lib/railway/types";
 import type { SummaryJob } from "@/lib/code/ai-summary";
 import type { ChatReply } from "@/lib/chat/types";
@@ -161,6 +161,42 @@ export async function refreshDataAction(): Promise<void> {
   clearSummaryStatusCache();
   clearCloneCache();
   revalidatePath("/", "layout");
+}
+
+/**
+ * Refresh without throwing the saved copy away first: returns a refresh id the browser sends
+ * (REFRESH_HEADER) while it renders each tab again in the background. Null in demo mode, where
+ * nothing is saved; then the browser falls back to refreshDataAction.
+ */
+export async function startRefreshAction(): Promise<ActionResult<{ id: string | null; startedAt: number | null }>> {
+  try {
+    const { beginRefresh } = await import("@/lib/railway/client");
+    const started = beginRefresh();
+    return { ok: true, data: { id: started?.id ?? null, startedAt: started?.startedAt ?? null } };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
+}
+
+/** Swap a background refresh's reads in at once, then re-read local code info like Refresh does. */
+export async function finishRefreshAction(id: unknown): Promise<ActionResult<RefreshOutcome>> {
+  try {
+    if (typeof id !== "string" || !/^[0-9a-f-]{36}$/.test(id)) throw new UserFacingError("Invalid request.");
+    const { finishRefresh } = await import("@/lib/railway/client");
+    const outcome = finishRefresh(id);
+    const [{ clearRepoInfoCache }, { clearSummaryStatusCache }, { clearCloneCache }] = await Promise.all([
+      import("@/lib/code"),
+      import("@/lib/code/ai-summary"),
+      import("@/lib/code/sources"),
+    ]);
+    clearRepoInfoCache();
+    clearSummaryStatusCache();
+    clearCloneCache();
+    revalidatePath("/", "layout");
+    return { ok: true, data: outcome };
+  } catch (error) {
+    return { ok: false, error: toMessage(error) };
+  }
 }
 
 export async function getWriteModeAction(): Promise<ActionResult<{ writeMode: boolean }>> {

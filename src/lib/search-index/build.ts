@@ -8,7 +8,9 @@ import { MOCK_REPOS } from "../code/mock-corpus";
 import { summarizeReadme } from "../code/readme";
 import { cloneFor, githubToken, localClones, mapLimit, repoKey, run } from "../code/sources";
 import { isMockMode } from "../config";
+import { AUTO_REFRESH_AFTER_MS } from "../preload";
 import { loadAccountViews, loadWorkspaceBundle, uniqueWorkspaceTargets, type ProjectSummary } from "../railway/api";
+import { isRefreshing, oldestCachedAt } from "../railway/client";
 import { EMBED_MODEL, embed, embeddingsDisabledReason, toBlob } from "./embed";
 import { safeIndexFile } from "./safe-file";
 import { pruneCopies, syncCopy } from "./repo-cache";
@@ -96,6 +98,11 @@ export function startIndexJob(mode: "update" | "rebuild" = "update"): boolean {
 /** Start an update in the background if the index is missing or a day old. Cheap to call on every page load. */
 export function ensureIndex() {
   try {
+    // Not while a refresh is reading Railway: the update downloads repos and computes embeddings in
+    // this same process, which made Refresh take minutes. The next Overview after the swap starts it.
+    // Nor when the saved copy is old enough that the browser is about to refresh it automatically.
+    const savedAt = oldestCachedAt();
+    if (isRefreshing() || (savedAt != null && Date.now() - savedAt > AUTO_REFRESH_AFTER_MS)) return;
     if (indexNeedsUpdate()) startIndexJob("update");
   } catch {
     // The index is a convenience: never let it break a page.
