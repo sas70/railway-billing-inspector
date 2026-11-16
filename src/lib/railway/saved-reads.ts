@@ -39,6 +39,19 @@ export class SavedReads {
       .run(key, account, fetchedAt, fetchedAt, JSON.stringify(data));
   }
 
+  /**
+   * Swap in a background refresh in one transaction, so a page never sees half old, half new.
+   * `replace`: forget everything first (the refresh read every page cleanly). Otherwise the new
+   * reads are written over the old ones and the rest is kept (some reads failed).
+   */
+  swap(entries: { key: string; account: string; data: unknown; fetchedAt: number }[], replace: boolean) {
+    const insert = this.db.prepare("INSERT OR REPLACE INTO reads (key, account, fetched_at, used_at, data) VALUES (?, ?, ?, ?, ?)");
+    this.db.transaction(() => {
+      if (replace) this.db.exec("DELETE FROM reads");
+      for (const e of entries) insert.run(e.key, e.account, e.fetchedAt, e.fetchedAt, JSON.stringify(e.data));
+    })();
+  }
+
   /** Forget every saved read, or just one account's. */
   clear(account?: string) {
     if (account == null) this.db.exec("DELETE FROM reads");

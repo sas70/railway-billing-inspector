@@ -1,6 +1,6 @@
 import "server-only";
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
@@ -8,6 +8,7 @@ import { isMockMode, type AccountConfig } from "../config";
 import type { GqlDoc } from "./documents";
 import { RailwayApiError, type RailwayErrorKind } from "./errors";
 import { mockRequest } from "./mock";
+import { requestRefreshId } from "./refresh-context";
 import { SavedReads } from "./saved-reads";
 
 export { RailwayApiError, errorMessage } from "./errors";
@@ -15,9 +16,11 @@ export { RailwayApiError, errorMessage } from "./errors";
 export const RAILWAY_ENDPOINT = "https://backboard.railway.com/graphql/v2";
 
 /**
- * Reads are kept until you press Refresh (or make a change from this app), with no time limit.
+ * Reads are kept until a refresh replaces them (or a change made from this app clears them).
  * They live in memory and in data/railway-cache.sqlite, so a server restart doesn't re-read
- * Railway either. The "Updated … ago" label next to Refresh says how old they are.
+ * Railway either. Refresh, and opening the dashboard on a copy over an hour old, re-read Railway
+ * in the background and swap the new reads in at once (beginRefresh / finishRefresh), so pages
+ * never wait on an empty cache. The "Updated … ago" label next to Refresh says how old they are.
  */
 /** Railway allows 10 req/s on Hobby; keep well under it per token. */
 const MAX_IN_FLIGHT_PER_ACCOUNT = 4;
@@ -30,6 +33,27 @@ const MAX_AUTO_RETRY_WAIT_S = 10;
 export type RateInfo = { limit?: number; remaining?: number; reset?: string; updatedAt: number };
 
 type CacheEntry = { fetchedAt: number; data: unknown };
+
+/**
+ * A background refresh: the pages are rendered again (with REFRESH_HEADER) while the saved copy
+ * keeps serving everyone else. Their Railway reads collect in `pending`, and finishRefresh()
+ * swaps them in at once.
+ */
+type RefreshState = {
+  id: string;
+  startedAt: number;
+  /** The cache generation when it started: a change made during the refresh voids its reads. */
+  startedIn: number;
+  pending: Map<string, { account: string; data: unknown }>;
+  inflight: Map<string, Promise<unknown>>;
+  /** Reads that failed for a reason that might pass (network, rate limit, Railway error, auth). */
+  failed: number;
+};
+
+/** A refresh nobody finished (the browser tab closed) is abandoned after this. */
+const REFRESH_ABANDON_MS = 5 * 60_000;
+/** Failures worth keeping the old copy for; query errors (a refused grouping) are the same when read live. */
+const PASSING_FAILURES: ReadonlySet<RailwayErrorKind> = new Set(["network", "server", "rate_limit", "auth"]);
 type Limiter = { active: number; queue: (() => void)[] };
 
 // Module state lives on globalThis so it survives hot reloads in `next dev`.
@@ -40,6 +64,7 @@ const store = globalThis as typeof globalThis & {
   __rbiLimiters?: Map<string, Limiter>;
   __rbiGeneration?: { value: number };
   __rbiSaved?: SavedReads | null;
+  __rbiRefresh?: RefreshState | null;
 };
 const cache = (store.__rbiCache ??= new Map<string, CacheEntry>());
 const inflight = (store.__rbiInflight ??= new Map<string, Promise<unknown>>());
@@ -144,6 +169,94 @@ export function clearCache(accountKey?: string) {
   }
   for (const key of cache.keys()) if (key.startsWith(`${accountKey}|`)) cache.delete(key);
   for (const key of inflight.keys()) if (key.startsWith(`${accountKey}|`)) inflight.delete(key);
+}
+
+// ── Background refresh ──────────────────────────────────────────────────────
+
+/** Start a background refresh, or join the one already running. Null in demo mode (nothing is saved). */
+export function beginRefresh(now = Date.now()): { id: string; startedAt: number } | null {
+  if (isMockMode()) return null;
+  const current = store.__rbiRefresh;
+  if (current && now - current.startedAt < REFRESH_ABANDON_MS) return { id: current.id, startedAt: current.startedAt };
+  const state: RefreshState = { id: randomUUID(), startedAt: now, startedIn: generation.value, pending: new Map(), inflight: new Map(), failed: 0 };
+  store.__rbiRefresh = state;
+  return { id: state.id, startedAt: state.startedAt };
+}
+
+export function isRefreshing(now = Date.now()): boolean {
+  const current = store.__rbiRefresh;
+  return !!current && now - current.startedAt < REFRESH_ABANDON_MS;
+}
+
+export type RefreshOutcome = {
+  swapped: boolean;
+  /** Every saved read was replaced (nothing failed); otherwise new reads were laid over the old ones. */
+  replaced: boolean;
+  reads: number;
+  failed: number;
+  reason?: string;
+};
+
+/**
+ * Swap a finished refresh in. With no passing failures, the saved copy is replaced outright, so
+ * pages it didn't render (a project you opened last week) are read again when you open them.
+ * Otherwise the new reads are laid over the old ones and nothing is lost. Each read is stamped
+ * with the refresh's start, so "Updated … ago" and the time windows anchored to it line up.
+ */
+export function finishRefresh(id: string): RefreshOutcome {
+  const state = store.__rbiRefresh;
+  if (!state || state.id !== id) return { swapped: false, replaced: false, reads: 0, failed: 0, reason: "This refresh isn't running any more." };
+  store.__rbiRefresh = null;
+  if (state.startedIn !== generation.value) {
+    return { swapped: false, replaced: false, reads: 0, failed: state.failed, reason: "A change was made during the refresh, so pages read Railway again as you open them." };
+  }
+  if (state.pending.size === 0) return { swapped: false, replaced: false, reads: 0, failed: state.failed, reason: "Nothing could be read from Railway." };
+  const replace = state.failed === 0;
+  const entries = [...state.pending].map(([key, e]) => ({ key, account: e.account, data: e.data, fetchedAt: state.startedAt }));
+  try {
+    saved()?.swap(entries, replace);
+  } catch {}
+  if (replace) cache.clear();
+  for (const e of entries) cache.set(e.key, { fetchedAt: e.fetchedAt, data: e.data });
+  return { swapped: true, replaced: replace, reads: entries.length, failed: state.failed };
+}
+
+/** The refresh this request is rendering for, if any. */
+async function refreshForRequest(): Promise<RefreshState | null> {
+  const state = store.__rbiRefresh;
+  if (!state) return null;
+  return (await requestRefreshId()) === state.id ? state : null;
+}
+
+/**
+ * The moment rolling windows (the last 2 days, cost history, metrics) are anchored to: when the
+ * saved copy was read, or when the refresh being rendered started, so they match after the swap.
+ */
+export async function dataClock(): Promise<number> {
+  const refresh = await refreshForRequest();
+  if (refresh) return refresh.startedAt;
+  return oldestCachedAt() ?? Date.now();
+}
+
+function refreshRead<T>(state: RefreshState, account: AccountConfig, doc: GqlDoc, variables: Record<string, unknown>, cacheKey: string): Promise<T> {
+  const done = state.pending.get(cacheKey);
+  if (done) return Promise.resolve(done.data as T);
+  const running = state.inflight.get(cacheKey);
+  if (running) return running as Promise<T>;
+  const promise = withSlot(account.key, () => execute<T>(account, doc, variables))
+    .then((data) => {
+      state.pending.set(cacheKey, { account: account.key, data });
+      return data;
+    })
+    .catch((error: unknown) => {
+      if (!(error instanceof RailwayApiError) || PASSING_FAILURES.has(error.kind)) state.failed++;
+      throw error;
+    })
+    .finally(() => {
+      if (state.inflight.get(cacheKey) === promise) state.inflight.delete(cacheKey);
+    });
+  state.inflight.set(cacheKey, promise);
+  return promise;
 }
 
 /** When the oldest saved read was fetched (ms since epoch), or null when nothing is saved. */
@@ -267,7 +380,8 @@ async function execute<T>(account: AccountConfig, doc: GqlDoc, variables: Record
 /**
  * Send one GraphQL operation to Railway with the account's token.
  * - Queries: saved until Refresh, with no time limit (per account + variables, in memory and on disk),
- *   de-duplicated while in flight.
+ *   de-duplicated while in flight. During a background refresh, the pages it renders read Railway
+ *   into the refresh instead (see beginRefresh / finishRefresh).
  * - Mutations: never cached; a mutation clears that account's cache.
  * - Any `errors` entry throws — Railway reports auth failures as HTTP 200 + errors.
  */
@@ -293,6 +407,10 @@ export async function railwayRequest<T>(
   const operation = createHash("sha256").update(doc.query).digest("hex");
   const cacheKey = `${account.key}|v2|${identity}|${doc.name}|${operation}|${stableStringify(variables)}`;
   if (!opts.fresh) {
+    // Rendering a page for a background refresh: read Railway, but leave the saved copy alone until the swap.
+    const refresh = await refreshForRequest();
+    if (refresh) return refreshRead<T>(refresh, account, doc, variables, cacheKey);
+
     const hit = readSaved(cacheKey);
     if (hit) return hit.data as T;
     const pending = inflight.get(cacheKey);

@@ -9,7 +9,7 @@ import { changeMoney, changePercent, compareHistory, historyRangeLabel, historyW
 import { money, plural } from "@/lib/format";
 import { loadAccountViews, loadWorkspaceUsage, settle, uniqueWorkspaceTargets } from "@/lib/railway/api";
 
-import { oldestCachedAt } from "@/lib/railway/client";
+import { dataClock } from "@/lib/railway/client";
 
 export const metadata: Metadata = { title: "Cost history" };
 
@@ -20,7 +20,7 @@ export default async function CostHistoryPage({ searchParams }: Props) {
   const sp = await searchParams;
   const days = sp.days === "7" ? 7 : 30;
   const accounts = await loadAccountViews();
-  const windows = historyWindows(days, new Date(oldestCachedAt() ?? Date.now()));
+  const windows = historyWindows(days, new Date(await dataClock()));
   if (accounts.length === 0) return <SetupGuide />;
   const targets = uniqueWorkspaceTargets(accounts);
   const entries = await Promise.all(targets.map(async ({ account, workspace }) => {

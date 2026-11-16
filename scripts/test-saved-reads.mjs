@@ -63,3 +63,18 @@ test("saved reads survive a year without visits until explicitly refreshed", () 
   assert.equal(later.get("used", 365 * DAY + DAY).data, 2);
   later.close();
 });
+
+test("a background refresh swaps in at once: replaced when clean, laid over the old copy when not", () => {
+  const store = new SavedReads(join(dbDir, "swap.sqlite"));
+  store.set("main|A|{}", "main", "old A", 100);
+  store.set("main|B|{}", "main", "old B", 100);
+  store.swap([{ key: "main|A|{}", account: "main", data: "new A", fetchedAt: 500 }], false);
+  assert.equal(store.get("main|A|{}", 600).data, "new A");
+  assert.equal(store.get("main|B|{}", 600).data, "old B", "kept when some reads failed");
+  assert.equal(store.oldest(), 100);
+  store.swap([{ key: "main|A|{}", account: "main", data: "newer A", fetchedAt: 900 }], true);
+  assert.equal(store.get("main|B|{}", 1000), null, "a clean refresh drops what it didn't read");
+  assert.equal(store.count(), 1);
+  assert.equal(store.oldest(), 900);
+  store.close();
+});

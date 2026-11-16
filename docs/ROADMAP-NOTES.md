@@ -42,6 +42,7 @@ Off, but still charging (from the last 2 days' real charges); bill summary by st
 
 ## Decided
 
+- Saved Railway reads have no expiry, but opening the dashboard on a copy over an hour old refreshes it in the background (Nov 15, 2026). Refresh never empties the screen: the saved copy stays until the new one is complete.
 - Usage limits are Railway's own, per workspace (compute alert and hard limit, Railway Agent limit). No dashboard-only per-project budgets: Railway wouldn't enforce them. A typed phrase only when a change can stop services or removes the hard limit.
 - Votes on the roadmap use GitHub issues, not a database.
 - Rename suggestions are slugs (`acme-status-page`).
