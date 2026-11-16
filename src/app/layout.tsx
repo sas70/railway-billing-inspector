@@ -75,6 +75,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <NavLink href="/services">Services</NavLink>
               <NavLink href="/search">Search</NavLink>
               <NavLink href="/billing">Billing</NavLink>
+              <NavLink href="/limits">Limits</NavLink>
               <NavLink href="/audit">
                 <span className="whitespace-nowrap">
                   Audit<span className="hidden sm:inline"> log</span>

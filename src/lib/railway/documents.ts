@@ -91,6 +91,18 @@ query WorkspaceBilling($workspaceId: String!) {
   }
 }`);
 
+/** Railway Agent spend and its limit (tracked apart from the compute usage limit). */
+export const WorkspaceAgentUsage = q("WorkspaceAgentUsage", /* GraphQL */ `
+query WorkspaceAgentUsage($workspaceId: String!) {
+  agentUsage(workspaceId: $workspaceId) {
+    totalUsedCents
+    softLimitCents
+    hardLimitCents
+    hasCustomHardLimit
+    billingPeriodEnd
+  }
+}`);
+
 export const WorkspaceInvoices = q("WorkspaceInvoices", /* GraphQL */ `
 query WorkspaceInvoices($workspaceId: String!) {
   workspace(workspaceId: $workspaceId) {
@@ -573,4 +585,23 @@ mutation ProjectScheduleDelete($id: String!) {
 export const ProjectScheduleDeleteCancel = m("ProjectScheduleDeleteCancel", /* GraphQL */ `
 mutation ProjectScheduleDeleteCancel($id: String!) {
   projectScheduleDeleteCancel(id: $id)
+}`);
+
+// Usage limits are per workspace (Railway's "customer"); see src/lib/limits.ts.
+// usageLimitSet is a full set, not a patch: the alert (0 = none) and the hard limit
+// (null = none) are both sent every time, the same way the Railway CLI does it.
+
+export const UsageLimitSet = m("UsageLimitSet", /* GraphQL */ `
+mutation UsageLimitSet($input: UsageLimitSetInput!) {
+  usageLimitSet(input: $input)
+}`);
+
+export const UsageLimitRemove = m("UsageLimitRemove", /* GraphQL */ `
+mutation UsageLimitRemove($input: UsageLimitRemoveInput!) {
+  usageLimitRemove(input: $input)
+}`);
+
+export const AgentUsageLimitSet = m("AgentUsageLimitSet", /* GraphQL */ `
+mutation AgentUsageLimitSet($input: AgentUsageLimitSetInput!) {
+  agentUsageLimitSet(input: $input)
 }`);

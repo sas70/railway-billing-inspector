@@ -277,8 +277,12 @@ function WorkspaceBilling({ bundle, invoices, which }: { bundle: WorkspaceBundle
           </Kv>
           <Kv label="Usage limit">
             {billing.usageLimit
-              ? `alert at ${money(billing.usageLimit.softLimit, { whole: true })}${billing.usageLimit.hardLimit != null ? ` · hard stop ${money(billing.usageLimit.hardLimit, { whole: true })}` : " · no hard limit"}`
-              : "none set"}
+              ? [
+                  billing.usageLimit.softLimit > 0 ? `alert at ${money(billing.usageLimit.softLimit, { whole: true })}` : "no alert",
+                  billing.usageLimit.hardLimit != null ? `hard stop ${money(billing.usageLimit.hardLimit, { whole: true })}` : "no hard limit",
+                ].join(" · ")
+              : "none set"}{" "}
+            · <Link href={`/limits#ws-${bundle.workspace.id}`} className="link">Change</Link>
           </Kv>
           <Kv label="Next invoice">
             {billing.nextInvoice ? (

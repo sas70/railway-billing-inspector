@@ -271,6 +271,9 @@ export async function loadAllProjects(views: AccountView[], opts: { fresh?: bool
 // ── Billing ─────────────────────────────────────────────────────────────────
 
 export type BillingView = {
+  /** Railway's billing customer for the workspace (what usage-limit changes are sent to). */
+  customerId: string;
+  workspaceName: string;
   plan: T.Plan;
   state: string;
   isTrialing: boolean;
@@ -286,11 +289,13 @@ export type BillingView = {
   nextInvoice: { date: string; amountSoFar: number; status: string; cancelAtPeriodEnd: boolean } | null;
 };
 
-export async function loadWorkspaceBilling(account: AccountConfig, workspaceId: string): Promise<BillingView> {
-  const { workspace } = await railwayRequest<T.WorkspaceBillingResult>(account, D.WorkspaceBilling, { workspaceId });
+export async function loadWorkspaceBilling(account: AccountConfig, workspaceId: string, opts: { fresh?: boolean } = {}): Promise<BillingView> {
+  const { workspace } = await railwayRequest<T.WorkspaceBillingResult>(account, D.WorkspaceBilling, { workspaceId }, opts);
   const c = workspace.customer;
   const sub = [...c.subscriptions].sort((a, b) => (a.nextInvoiceDate < b.nextInvoiceDate ? -1 : 1))[0];
   return {
+    customerId: c.id,
+    workspaceName: workspace.name,
     plan: workspace.plan,
     state: c.state,
     isTrialing: c.isTrialing,
@@ -304,6 +309,29 @@ export async function loadWorkspaceBilling(account: AccountConfig, workspaceId: 
     nextInvoice: sub
       ? { date: sub.nextInvoiceDate, amountSoFar: sub.nextInvoiceCurrentTotal / 100, status: sub.status, cancelAtPeriodEnd: sub.cancelAtPeriodEnd }
       : null,
+  };
+}
+
+export type AgentUsageView = {
+  usedCents: number;
+  /** null: no email alert. */
+  softCents: number | null;
+  /** 0: agent blocked; null: no limit reported. */
+  hardCents: number | null;
+  /** false: Railway's default for the plan ($5 Hobby, $20 Pro). */
+  custom: boolean | null;
+  periodEnd: string;
+};
+
+/** Railway Agent spend this period and its limit. Railway tracks it apart from compute usage. */
+export async function loadAgentUsage(account: AccountConfig, workspaceId: string, opts: { fresh?: boolean } = {}): Promise<AgentUsageView> {
+  const { agentUsage: a } = await railwayRequest<T.AgentUsageResult>(account, D.WorkspaceAgentUsage, { workspaceId }, opts);
+  return {
+    usedCents: a.totalUsedCents,
+    softCents: a.softLimitCents ? a.softLimitCents : null,
+    hardCents: a.hardLimitCents,
+    custom: a.hasCustomHardLimit,
+    periodEnd: a.billingPeriodEnd,
   };
 }
 
@@ -425,7 +453,7 @@ function aggregateUsage(result: T.WorkspaceUsageResult, period: Period | null, w
  */
 const environmentGroupingRefused = ((globalThis as typeof globalThis & { __rbiNoEnvGrouping?: Set<string> }).__rbiNoEnvGrouping ??= new Set<string>());
 
-export async function loadWorkspaceUsage(account: AccountConfig, workspaceId: string, period?: Period): Promise<UsageView> {
+export async function loadWorkspaceUsage(account: AccountConfig, workspaceId: string, period?: Period, opts: { fresh?: boolean } = {}): Promise<UsageView> {
   const base: Record<string, unknown> = { workspaceId, measurements: [...USAGE_MEASUREMENTS] };
   if (period) {
     base.startDate = period.start;
@@ -433,23 +461,22 @@ export async function loadWorkspaceUsage(account: AccountConfig, workspaceId: st
   }
   const refusedKey = `${account.key}|${workspaceId}`;
   if (environmentGroupingRefused.has(refusedKey)) {
-    const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, { ...base, groupBy: ["PROJECT_ID", "SERVICE_ID"] });
+    const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, { ...base, groupBy: ["PROJECT_ID", "SERVICE_ID"] }, opts);
     return aggregateUsage(result, period ?? null, false);
   }
   try {
-    const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, {
-      ...base,
-      groupBy: ["PROJECT_ID", "SERVICE_ID", "ENVIRONMENT_ID"],
-    });
+    const result = await railwayRequest<T.WorkspaceUsageResult>(
+      account,
+      D.WorkspaceUsage,
+      { ...base, groupBy: ["PROJECT_ID", "SERVICE_ID", "ENVIRONMENT_ID"] },
+      opts,
+    );
     return aggregateUsage(result, period ?? null, true);
   } catch (error) {
     // Some grouping combinations may be refused; fall back to the CLI's grouping.
     if (error instanceof RailwayApiError && ["auth", "rate_limit", "network", "not_found"].includes(error.kind)) throw error;
     environmentGroupingRefused.add(refusedKey);
-    const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, {
-      ...base,
-      groupBy: ["PROJECT_ID", "SERVICE_ID"],
-    });
+    const result = await railwayRequest<T.WorkspaceUsageResult>(account, D.WorkspaceUsage, { ...base, groupBy: ["PROJECT_ID", "SERVICE_ID"] }, opts);
     return aggregateUsage(result, period ?? null, false);
   }
 }
@@ -457,11 +484,13 @@ export async function loadWorkspaceUsage(account: AccountConfig, workspaceId: st
 export type EstimateView = { byProject: Record<string, CostBreakdown>; total: CostBreakdown };
 
 /** Railway's projection of each project's usage at the end of the current period. */
-export async function loadWorkspaceEstimates(account: AccountConfig, workspaceId: string): Promise<EstimateView> {
-  const { estimatedUsage } = await railwayRequest<T.WorkspaceEstimatedResult>(account, D.WorkspaceEstimatedUsage, {
-    workspaceId,
-    measurements: [...USAGE_MEASUREMENTS],
-  });
+export async function loadWorkspaceEstimates(account: AccountConfig, workspaceId: string, opts: { fresh?: boolean } = {}): Promise<EstimateView> {
+  const { estimatedUsage } = await railwayRequest<T.WorkspaceEstimatedResult>(
+    account,
+    D.WorkspaceEstimatedUsage,
+    { workspaceId, measurements: [...USAGE_MEASUREMENTS] },
+    opts,
+  );
   const perProject = new Map<string, UsageTotals>();
   const total = emptyTotals();
   for (const row of estimatedUsage) {

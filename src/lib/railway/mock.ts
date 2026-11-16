@@ -134,8 +134,10 @@ type MWorkspace = {
   periodStart: number;
   periodEnd: number;
   creditBalance: number;
-  softLimit: number;
-  hardLimit: number | null;
+  /** Compute usage limit in whole dollars (softLimit 0 = no email alert); null when none is set. */
+  usageLimit: { softLimit: number; hardLimit: number | null } | null;
+  /** Railway Agent spend and limit, in cents. */
+  agent: { usedCents: number; softCents: number | null; hardCents: number; custom: boolean };
 };
 
 type World = { createdAt: number; workspaces: MWorkspace[]; projects: MProject[]; counter: number };
@@ -333,8 +335,26 @@ function buildWorld(): World {
   const periodEnd = Date.parse(shiftMonths(new Date(periodStart).toISOString(), 1));
 
   const workspaces: MWorkspace[] = [
-    { id: uuid("ws-personal"), name: "Personal", plan: "HOBBY", periodStart, periodEnd, creditBalance: 0, softLimit: 10, hardLimit: 25 },
-    { id: uuid("ws-studio"), name: "Studio", plan: "PRO", periodStart: periodStart + 4 * DAY, periodEnd: Date.parse(shiftMonths(new Date(periodStart + 4 * DAY).toISOString(), 1)), creditBalance: 12.5, softLimit: 100, hardLimit: null },
+    {
+      id: uuid("ws-personal"),
+      name: "Personal",
+      plan: "HOBBY",
+      periodStart,
+      periodEnd,
+      creditBalance: 0,
+      usageLimit: { softLimit: 10, hardLimit: 25 },
+      agent: { usedCents: 0, softCents: null, hardCents: 500, custom: false },
+    },
+    {
+      id: uuid("ws-studio"),
+      name: "Studio",
+      plan: "PRO",
+      periodStart: periodStart + 4 * DAY,
+      periodEnd: Date.parse(shiftMonths(new Date(periodStart + 4 * DAY).toISOString(), 1)),
+      creditBalance: 12.5,
+      usageLimit: { softLimit: 100, hardLimit: null },
+      agent: { usedCents: 312, softCents: 500, hardCents: 700, custom: true },
+    },
   ];
   const wsByKey = { personal: workspaces[0], studio: workspaces[1] };
 
@@ -564,6 +584,12 @@ function settle(w: World) {
 
 const notFound = (what: string, op: string) => new RailwayApiError(`${what} not found (${op})`, { kind: "not_found", operation: op });
 const refuse = (message: string, op: string) => new RailwayApiError(`${message} (${op})`, { kind: "graphql", operation: op });
+
+function workspaceByCustomer(w: World, customerId: unknown, op: string) {
+  const ws = w.workspaces.find((x) => uuid(`cus-${x.id}`) === customerId);
+  if (!ws) throw notFound("Customer", op);
+  return ws;
+}
 
 function findWorkspace(w: World, id: unknown, op: string) {
   const ws = w.workspaces.find((x) => x.id === id);
@@ -957,7 +983,9 @@ const HANDLERS: Record<string, Handler> = {
           appliedCredits: 0,
           remainingUsageCreditBalance: Math.max(0, included - usage),
           billingPeriod: { start: iso(ws.periodStart), end: iso(ws.periodEnd) },
-          usageLimit: { softLimit: ws.softLimit, hardLimit: ws.hardLimit, isOverLimit: false },
+          usageLimit: ws.usageLimit
+            ? { ...ws.usageLimit, isOverLimit: ws.usageLimit.hardLimit != null && ws.usageLimit.hardLimit > 0 && usage >= ws.usageLimit.hardLimit }
+            : null,
           subscriptions: [
             {
               id: `sub_demo_${ws.plan.toLowerCase()}`,
@@ -969,6 +997,19 @@ const HANDLERS: Record<string, Handler> = {
             },
           ],
         },
+      },
+    };
+  },
+
+  WorkspaceAgentUsage: (w, v, op) => {
+    const ws = findWorkspace(w, v.workspaceId, op);
+    return {
+      agentUsage: {
+        totalUsedCents: ws.agent.usedCents,
+        softLimitCents: ws.agent.softCents,
+        hardLimitCents: ws.agent.hardCents,
+        hasCustomHardLimit: ws.agent.custom,
+        billingPeriodEnd: iso(ws.periodEnd),
       },
     };
   },
@@ -1285,6 +1326,43 @@ const HANDLERS: Record<string, Handler> = {
       project.description = input.description.trim() || null;
     }
     return { projectUpdate: { id: project.id, name: project.name, description: project.description } };
+  },
+
+  // Same checks Railway (and its CLI) apply; see src/lib/limit-rules.ts.
+  UsageLimitSet: (w, v, op) => {
+    const input = (v.input ?? {}) as { customerId?: unknown; softLimitDollars?: unknown; hardLimitDollars?: unknown };
+    const ws = workspaceByCustomer(w, input.customerId, op);
+    const soft = input.softLimitDollars;
+    const hard = input.hardLimitDollars ?? null;
+    if (typeof soft !== "number" || !Number.isInteger(soft) || soft < 0 || (soft > 0 && soft < 5) || soft > 500_000) {
+      throw refuse("Email alert must be $0 or a whole dollar amount from $5 to $500,000", op);
+    }
+    if (hard !== null && (typeof hard !== "number" || !Number.isInteger(hard) || hard < 10 || hard > 500_000)) {
+      throw refuse("Hard limit must be a whole dollar amount from $10 to $500,000", op);
+    }
+    if (hard !== null && hard < soft) throw refuse("Hard limit must be greater than or equal to the email alert", op);
+    ws.usageLimit = { softLimit: soft, hardLimit: hard };
+    return { usageLimitSet: true };
+  },
+
+  UsageLimitRemove: (w, v, op) => {
+    const input = (v.input ?? {}) as { customerId?: unknown };
+    const ws = workspaceByCustomer(w, input.customerId, op);
+    ws.usageLimit = null;
+    return { usageLimitRemove: true };
+  },
+
+  AgentUsageLimitSet: (w, v, op) => {
+    const input = (v.input ?? {}) as { workspaceId?: unknown; hardLimitCents?: unknown; softLimitCents?: unknown };
+    const ws = findWorkspace(w, input.workspaceId, op);
+    const hard = input.hardLimitCents;
+    const soft = input.softLimitCents ?? null;
+    if (typeof hard !== "number" || !Number.isInteger(hard) || hard < 0 || hard > 50_000_000) throw refuse("Agent hard limit must be $0 to $500,000", op);
+    if (soft !== null && (typeof soft !== "number" || !Number.isInteger(soft) || soft < 0 || soft > hard)) {
+      throw refuse("Agent email alert must be $0 up to the hard limit", op);
+    }
+    ws.agent = { ...ws.agent, hardCents: hard, softCents: soft || null, custom: true };
+    return { agentUsageLimitSet: true };
   },
 
   ProjectScheduleDelete: (w, v, op) => {

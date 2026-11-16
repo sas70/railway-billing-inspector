@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Usage limits.** A new **Limits** page shows each workspace's compute spend against its email alert and hard limit (with the projected bill marked on the meter) and its Railway Agent spend against the agent limit, and lets you set, change or remove them through the usual review → approve → audit path. Railway sets these per workspace; it has no per-project limit, and the page says so. A change that sets the hard limit at or below usage so far or the projected bill, or removes the hard limit, needs a typed phrase (`SET HARD LIMIT $10`, `REMOVE HARD LIMIT`); other changes need one confirm click. Limits and usage are re-read right before the change is sent, and success is only reported once Railway shows the new values. Billing's **Usage limit** line links to it, and the assistant knows the page. Railway `usageLimitSet`, `usageLimitRemove`, `agentUsageLimitSet`; demo mode supports all three.
 - Volume deletion requires a new review if the volume instance, service attachment, mount path, or running state changes after approval was prepared.
 - Volume explanations enforce the configured workspace scope and verify environment membership using fresh reads before collecting context.
 - Assistant answers preserve unavailable costs and recent charges, and disclose incomplete account or workspace data instead of reporting zero spending.

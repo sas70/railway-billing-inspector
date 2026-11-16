@@ -98,6 +98,8 @@ These are real numbers from one of my Railway workspaces. I run several Railway 
   </tr>
 </table>
 
+**New: usage limits.** See each workspace's compute and Railway Agent spend against its limits, with the projected bill marked, and set, change or remove them after a review. Lowering the hard limit to where it would stop your services, or removing it, needs a typed phrase.
+
 ## Run it in five minutes
 
 You need Node.js 20.9 or newer and a Railway account token.

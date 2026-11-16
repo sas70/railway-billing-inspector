@@ -3,7 +3,7 @@
  * that's already here instead of "Reading from Railway…". Includes every dashboard
  * tab and billing window; project detail pages load when opened.
  */
-export const PRELOAD_ROUTES = ["/", "/services", "/search", "/billing", "/billing?period=previous", "/billing/history", "/billing/history?days=7", "/billing/history?days=30", "/rename", "/audit"] as const;
+export const PRELOAD_ROUTES = ["/", "/services", "/search", "/billing", "/billing?period=previous", "/billing/history", "/billing/history?days=7", "/billing/history?days=30", "/limits", "/rename", "/audit"] as const;
 
 /**
  * How long the browser keeps a page it has shown or preloaded, in seconds: a week, so in practice
